@@ -1,0 +1,94 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-surface: #0f0a14;
+  --color-surface-raised: #1a1225;
+  --color-surface-overlay: #241a30;
+  --color-accent: #e879a8;
+  --color-accent-soft: #f9a8d4;
+  --color-accent-glow: #ec4899;
+  --color-bubble-user: #7c3aed;
+  --color-bubble-ai: #2d1f3d;
+
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-display: 'Outfit', 'Inter', sans-serif;
+
+  --animate-fade-in: fade-in 0.3s ease-out;
+  --animate-slide-up: slide-up 0.35s ease-out;
+  --animate-pulse-soft: pulse-soft 2s ease-in-out infinite;
+  --animate-typing: typing 1.4s ease-in-out infinite;
+
+  @keyframes fade-in {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+  }
+
+  @keyframes slide-up {
+    0% { opacity: 0; transform: translateY(12px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes pulse-soft {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+
+  @keyframes typing {
+    0%, 60%, 100% { transform: translateY(0); }
+    30% { transform: translateY(-4px); }
+  }
+}
+
+@layer base {
+  * {
+    border-color: rgb(255 255 255 / 0.05);
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+  }
+
+  body {
+    background-color: var(--color-surface);
+    color: white;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    border-radius: 9999px;
+    background: rgb(255 255 255 / 0.1);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgb(255 255 255 / 0.2);
+  }
+}
+
+@utility glass {
+  background-color: rgb(255 255 255 / 0.03);
+  backdrop-filter: blur(24px);
+  border: 1px solid rgb(255 255 255 / 0.06);
+}
+
+@utility gradient-text {
+  background-image: linear-gradient(to right, var(--color-accent-soft), var(--color-accent), #c084fc);
+  background-clip: text;
+  color: transparent;
+}
+
+@utility glow-accent {
+  box-shadow: 0 0 40px -10px rgb(236 72 153 / 0.35);
+}

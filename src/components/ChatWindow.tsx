@@ -1,0 +1,127 @@
+import { useRef, useEffect } from 'react'
+import type { Message } from '@/types/chat'
+import { MessageBubble } from './MessageBubble'
+import { TypingIndicator } from './TypingIndicator'
+
+interface ChatWindowProps {
+  messages: Message[]
+  characterName: string
+  characterAvatar: string
+  isTyping: boolean
+  onBack: () => void
+}
+
+export function ChatWindow({
+  messages,
+  characterName,
+  characterAvatar,
+  isTyping,
+  onBack,
+}: ChatWindowProps) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  // Аналог viewWillAppear / viewDidAppear в Swift: скроллим вниз при монтировании и изменении сообщений
+  useEffect(() => {
+    const el = scrollRef.current
+    if (el) {
+      el.scrollTop = el.scrollHeight
+    }
+  }, [messages, isTyping])
+
+  return (
+    <div className="relative flex flex-1 flex-col overflow-hidden bg-surface-dark">
+      {/* 1. Фоновое изображение (backgroundImageView) */}
+      <div className="absolute inset-0 z-0 overflow-hidden">
+        <img
+          src={characterAvatar}
+          alt={characterName}
+          className="h-full w-full object-cover blur-[2px] scale-105"
+        />
+        {/* 2. Полупрозрачный черный слой поверх фото (backgroundOverlayView) */}
+        <div className="absolute inset-0 bg-black/60" />
+        {/* 3. Градиентный слой (gradientLayer) */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/80" />
+      </div>
+
+      {/* Основной контент поверх слоев фона */}
+      <div className="relative z-10 flex h-full flex-col">
+        {/* Header */}
+        <header className="flex h-14 shrink-0 items-center justify-between border-b border-white/10 bg-black/20 px-4 backdrop-blur-md">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onBack}
+              className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 text-white transition-colors hover:bg-white/20"
+              title="Back"
+            >
+              ←
+            </button>
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 overflow-hidden rounded-full ring-1 ring-white/20">
+                <img
+                  src={characterAvatar}
+                  alt={characterName}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+              <div>
+                <h1 className="font-display text-base font-semibold text-white">
+                  {characterName}
+                </h1>
+                <p className="text-xs text-white/50">Online</p>
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <HeaderButton icon="📞" label="Call" />
+            <HeaderButton icon="🎁" label="Gift" />
+          </div>
+        </header>
+
+        {/* Список сообщений */}
+        <div
+          ref={scrollRef}
+          className="flex flex-1 flex-col gap-4 overflow-y-auto px-6 py-5"
+        >
+          {messages.length === 0 && (
+            <div className="flex flex-1 flex-col items-center justify-center text-center">
+              <div className="mb-4 h-24 w-24 overflow-hidden rounded-full ring-4 ring-white/20 shadow-2xl">
+                <img
+                  src={characterAvatar}
+                  alt={characterName}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+              <p className="font-display text-lg font-medium text-white drop-shadow">
+                Start a conversation with {characterName}
+              </p>
+            </div>
+          )}
+
+          {messages.map((msg) => (
+            <MessageBubble
+              key={msg.id}
+              message={msg}
+              characterName={characterName}
+              characterAvatar={characterAvatar}
+            />
+          ))}
+
+          {isTyping && <TypingIndicator characterAvatar={characterAvatar} />}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function HeaderButton({ icon, label }: { icon: string; label: string }) {
+  return (
+    <button
+      type="button"
+      title={label}
+      className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 text-sm backdrop-blur-md transition-colors hover:bg-white/20"
+    >
+      {icon}
+    </button>
+  )
+}
