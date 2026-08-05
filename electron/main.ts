@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 dotenv.config({ path: process.cwd() + '/.env' });
-import { app, BrowserWindow, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, shell, session } from 'electron' // Добавлен session
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'fs'
@@ -186,6 +186,16 @@ ipcMain.handle('db:get-last-message', (_, characterId: string) => {
 })
 
 app.whenReady().then(() => {
+  // Подменяем Referer для запросов к YouTube, чтобы обходить блокировку iframe в Electron
+  session.defaultSession.webRequest.onBeforeSendHeaders(
+    { urls: ['*://*.youtube.com/*', '*://*.googlevideo.com/*'] },
+    (details, callback) => {
+      details.requestHeaders['Referer'] = 'https://www.youtube.com'
+      details.requestHeaders['Origin'] = 'https://www.youtube.com'
+      callback({ requestHeaders: details.requestHeaders })
+    }
+  )
+
   createWindow()
 
   app.on('activate', () => {

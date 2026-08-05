@@ -5,7 +5,7 @@ import { ChatInput } from '@/components/ChatInput'
 import { Sidebar } from '@/components/Sidebar'
 import { TabBar, TabType } from '@/components/TabBar'
 import { CreateGfView } from '@/components/CreateGfView'
-import { ReelsView } from '@/components/ReelsView'
+import { ReelsView, ReelItem } from '@/components/ReelsView'
 import { useChat } from '@/hooks/useChat'
 import { ttsService } from '@/services/ttsService'
 import type { CharacterRecord, MessageRecord, Character } from '@/types/chat'
@@ -15,6 +15,7 @@ export function App() {
   const [selectedCharId, setSelectedCharId] = useState<string | null>(null)
   const [characters, setCharacters] = useState<CharacterRecord[]>([])
   const [summaries, setSummaries] = useState<Array<{ character: CharacterRecord; lastMessage?: MessageRecord }>>([])
+  const [reels, setReels] = useState<ReelItem[]>([])
 
   const activeCharRecord = characters.find((c) => c.id === selectedCharId)
 
@@ -23,7 +24,7 @@ export function App() {
     activeCharRecord?.avatar
   )
 
-  const loadSummaries = useCallback(async () => {
+  const loadSummariesAndReels = useCallback(async () => {
     const api = typeof window !== 'undefined' ? (window.electronAPI as any) : undefined
     if (api && typeof api.getCharacters === 'function') {
       const chars: CharacterRecord[] = await api.getCharacters()
@@ -43,12 +44,34 @@ export function App() {
       })
 
       setSummaries(list)
+
+      // Fetch message history across characters to discover reel video links
+     // Fetch message history across characters to discover reel video links
+if (typeof api.getMessages === 'function') {
+  const extractedReels: ReelItem[] = []
+  for (const char of chars) {
+    const msgs: MessageRecord[] = await api.getMessages(char.id)
+    msgs.forEach((msg, idx) => {
+      if (msg.videoUrl) {
+        extractedReels.push({
+          // Гарантируем уникальный key даже при одинаковых msg.id
+          id: `${char.id}-${msg.id || idx}-${idx}`,
+          url: msg.videoUrl,
+          authorName: char.name,
+          authorAvatar: char.avatar,
+          likesCount: Math.floor(Math.random() * 500) + 50,
+        })
+      }
+    })
+  }
+  setReels(extractedReels)
+}
     }
   }, [])
 
   useEffect(() => {
-    loadSummaries()
-  }, [loadSummaries, selectedCharId])
+    loadSummariesAndReels()
+  }, [loadSummariesAndReels, selectedCharId])
 
   const activeCharacter: Character | null = activeCharRecord
     ? {
@@ -80,7 +103,7 @@ export function App() {
                 onBack={() => {
                   ttsService.stop()
                   setSelectedCharId(null)
-                  loadSummaries()
+                  loadSummariesAndReels()
                 }}
               />
               <ChatInput
@@ -99,7 +122,7 @@ export function App() {
               />
             )}
             {activeTab === 'create' && <CreateGfView />}
-            {activeTab === 'reels' && <ReelsView />}
+            {activeTab === 'reels' && <ReelsView reels={reels} />}
           </>
         )}
       </div>
