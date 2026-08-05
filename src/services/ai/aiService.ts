@@ -21,7 +21,7 @@ export interface ProxyResponse {
     }
   }
 }
-
+ 
 export type AIErrorCode =
   | 'invalidURL'
   | 'networkError'

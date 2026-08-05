@@ -22,7 +22,7 @@ export const DEFAULT_PROXY_URL =
 
 export async function fetchAIResponse(
   params: FetchAIParams,
-  authToken: string = process.env.VITE_APP_SECRET_TOKEN || import.meta.env?.VITE_APP_SECRET_TOKEN || '',
+  authToken: string = process.env.VITE_APP_SECRET_TOKEN || '',
 ): Promise<FetchAIResult> {
   const { userMessage, systemPrompt, useOnlyBillingApi } = params
 

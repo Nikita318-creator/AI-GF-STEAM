@@ -1,3 +1,5 @@
+import dotenv from 'dotenv';
+dotenv.config({ path: process.cwd() + '/.env' });
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
@@ -98,7 +100,7 @@ ipcMain.handle('get-keyboard-layout', async () => {
 })
 
 ipcMain.handle('ai:fetch', async (_event, params: FetchAIParams) => {
-  const authToken = process.env.VITE_APP_SECRET_TOKEN || import.meta.env?.VITE_APP_SECRET_TOKEN || ''
+  const authToken = process.env.VITE_APP_SECRET_TOKEN || ''
   return fetchAIResponse(params, authToken)
 })
 
