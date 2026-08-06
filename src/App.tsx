@@ -8,13 +8,17 @@ import { CreateGfView } from '@/components/CreateGfView'
 import { ReelsView, ReelItem } from '@/components/ReelsView'
 import { useChat } from '@/hooks/useChat'
 import { ttsService } from '@/services/ttsService'
+import { feedPool, friendsPool } from '@/components/feedVM'
 import type { CharacterRecord, MessageRecord, Character } from '@/types/chat'
-
+ 
 export function App() {
   const [activeTab, setActiveTab] = useState<TabType>('chats')
   const [selectedCharId, setSelectedCharId] = useState<string | null>(null)
   const [characters, setCharacters] = useState<CharacterRecord[]>([])
   const [summaries, setSummaries] = useState<Array<{ character: CharacterRecord; lastMessage?: MessageRecord }>>([])
+  
+  // По умолчанию жестко ставим 'friends'
+  const [reelsSubTab, setReelsSubTab] = useState<'friends' | 'feed'>('friends')
   const [reels, setReels] = useState<ReelItem[]>([])
 
   const activeCharRecord = characters.find((c) => c.id === selectedCharId)
@@ -25,6 +29,18 @@ export function App() {
   )
 
   const loadSummariesAndReels = useCallback(async () => {
+    // В зависимости от активной подвкладки выбираем нужный пул
+    const targetPool = reelsSubTab === 'friends' ? friendsPool : feedPool
+    
+    const youtubeReels: ReelItem[] = targetPool.map((url, idx) => ({
+      id: `${reelsSubTab}-reel-${idx}`,
+      url: url,
+      authorName: reelsSubTab === 'friends' ? `Friend #${(idx % 5) + 1}` : `Girlfriend #${(idx % 5) + 1}`,
+      authorAvatar: `/photos/pic${(idx % 10) + 1}.jpg`,
+      likesCount: Math.floor(Math.random() * 800) + 100,
+    }))
+    setReels(youtubeReels)
+
     const api = typeof window !== 'undefined' ? (window.electronAPI as any) : undefined
     if (api && typeof api.getCharacters === 'function') {
       const chars: CharacterRecord[] = await api.getCharacters()
@@ -44,30 +60,8 @@ export function App() {
       })
 
       setSummaries(list)
-
-      // Fetch message history across characters to discover reel video links
-     // Fetch message history across characters to discover reel video links
-if (typeof api.getMessages === 'function') {
-  const extractedReels: ReelItem[] = []
-  for (const char of chars) {
-    const msgs: MessageRecord[] = await api.getMessages(char.id)
-    msgs.forEach((msg, idx) => {
-      if (msg.videoUrl) {
-        extractedReels.push({
-          // Гарантируем уникальный key даже при одинаковых msg.id
-          id: `${char.id}-${msg.id || idx}-${idx}`,
-          url: msg.videoUrl,
-          authorName: char.name,
-          authorAvatar: char.avatar,
-          likesCount: Math.floor(Math.random() * 500) + 50,
-        })
-      }
-    })
-  }
-  setReels(extractedReels)
-}
     }
-  }, [])
+  }, [reelsSubTab])
 
   useEffect(() => {
     loadSummariesAndReels()
@@ -122,7 +116,37 @@ if (typeof api.getMessages === 'function') {
               />
             )}
             {activeTab === 'create' && <CreateGfView />}
-            {activeTab === 'reels' && <ReelsView reels={reels} />}
+            {activeTab === 'reels' && (
+              <div className="relative flex-1 h-full w-full">
+                {/* Шапка с подвкладками: Friends активна по дефолту */}
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-4 bg-black/50 backdrop-blur-md px-5 py-2 rounded-full border border-white/10 shadow-lg">
+                  <button
+                    type="button"
+                    onClick={() => setReelsSubTab('friends')}
+                    className={`text-sm font-bold transition-all relative ${
+                      reelsSubTab === 'friends'
+                        ? 'text-white border-b-2 border-white pb-0.5'
+                        : 'text-white/40 hover:text-white/80'
+                    }`}
+                  >
+                    Friends
+                  </button>
+                  <span className="text-white/20">|</span>
+                  <button
+                    type="button"
+                    onClick={() => setReelsSubTab('feed')}
+                    className={`text-sm font-bold transition-all relative ${
+                      reelsSubTab === 'feed'
+                        ? 'text-white border-b-2 border-white pb-0.5'
+                        : 'text-white/40 hover:text-white/80'
+                    }`}
+                  >
+                    Feed
+                  </button>
+                </div>
+                <ReelsView reels={reels} />
+              </div>
+            )}
           </>
         )}
       </div>

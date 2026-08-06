@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 dotenv.config({ path: process.cwd() + '/.env' });
-import { app, BrowserWindow, ipcMain, shell, session } from 'electron' // Добавлен session
+import { app, BrowserWindow, ipcMain, shell, session } from 'electron'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'fs'
@@ -112,7 +112,6 @@ ipcMain.handle('video:get', async (_, avatar?: string) => {
     const fileName = urlParts[urlParts.length - 1]
     const localFilePath = join(videosCacheDir, fileName)
 
-    // Если файла нет на диске — скачиваем
     if (!existsSync(localFilePath)) {
       console.log(`[VideoService] Downloading video from ${urlString}`)
       const response = await fetch(urlString)
@@ -123,7 +122,6 @@ ipcMain.handle('video:get', async (_, avatar?: string) => {
       console.log(`[VideoService] Video found in cache: ${fileName}`)
     }
 
-    // Читаем файл в буфер и возвращаем как base64 data-url
     const fileBuffer = readFileSync(localFilePath)
     return `data:video/mp4;base64,${fileBuffer.toString('base64')}`
   } catch (err) {
@@ -186,12 +184,13 @@ ipcMain.handle('db:get-last-message', (_, characterId: string) => {
 })
 
 app.whenReady().then(() => {
-  // Подменяем Referer для запросов к YouTube, чтобы обходить блокировку iframe в Electron
+  // Разрешаем iframe YouTube корректно обращаться к видео без блокировки 152
   session.defaultSession.webRequest.onBeforeSendHeaders(
     { urls: ['*://*.youtube.com/*', '*://*.googlevideo.com/*'] },
     (details, callback) => {
-      details.requestHeaders['Referer'] = 'https://www.youtube.com'
-      details.requestHeaders['Origin'] = 'https://www.youtube.com'
+      if (details.url.includes('/embed/')) {
+        details.requestHeaders['Referer'] = 'http://localhost:5173'
+      }
       callback({ requestHeaders: details.requestHeaders })
     }
   )

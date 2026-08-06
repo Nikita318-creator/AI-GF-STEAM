@@ -20,3 +20,4 @@ export function TypingIndicator({ characterAvatar }: TypingIndicatorProps) {
     </div>
   )
 }
+ 
