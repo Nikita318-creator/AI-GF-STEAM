@@ -12,6 +12,8 @@ import {
 
 export type CharacterCategory = 'gf' | 'anime' | 'milf' | 'ex'
 
+const FALLBACK_MOCK_TEXT = "oh my sweet boy, I don't even know what to answer to that"
+
 function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 }
@@ -41,23 +43,19 @@ function getRandomPhotoForCharacter(avatarPath?: string): string {
 
   switch (category) {
     case 'anime': {
-      // У каждого персонажа (avatarNum) 20 уникальных фоток в общей папке (от 1 до 20)
       const randomPhotoNum = Math.floor(Math.random() * 20) + 1
       return `/photos/${avatarNum}_${randomPhotoNum}.jpg`
     }
     case 'milf': {
-      // Пример диапазона/пути для MILF
       const randomPhotoNum = Math.floor(Math.random() * 15) + 1
       return `/photos/${avatarNum}_${randomPhotoNum}.jpg`
     }
     case 'ex': {
-      // Пример диапазона/пути для Ex
       const randomNum = Math.floor(Math.random() * 32) + 1
       return `/photos/ex${randomNum}.jpg`
     }
     case 'gf':
     default: {
-      // Существующая логика блондинка / брюнетка для реальных аватарок (1..10)
       const blondeAvatars = [1, 2, 4, 7, 10]
       const brunetteAvatars = [3, 5, 6, 8, 9]
 
@@ -79,13 +77,11 @@ async function getVideoForCharacter(avatarPath?: string): Promise<string | undef
   const category = getCharacterCategory(avatarPath)
   const api = typeof window !== 'undefined' ? (window.electronAPI as any) : undefined
 
-  // Если Electron API поддерживает передачу категории:
   if (api && typeof api.getVideo === 'function') {
     const fetchedUrl = await api.getVideo(avatarPath, category)
     if (fetchedUrl) return fetchedUrl
   }
 
-  // Фоллбек на локальные папки в зависимости от категории
   switch (category) {
     case 'anime': {
       const randomNum = Math.floor(Math.random() * 10) + 1
@@ -169,7 +165,7 @@ export function useChat(activeCharacterId: string | null, characterAvatar?: stri
           imageUrl: msg.imageUrl,
           videoUrl: msg.videoUrl,
           isAudio: msg.isAudio ? 1 : 0,
-          audioUrl: undefined,
+          audioUrl: msg.audioUrl,
         })
       } catch (err) {
         console.error('Failed to persist message to SQLite:', err)
@@ -200,7 +196,7 @@ export function useChat(activeCharacterId: string | null, characterAvatar?: stri
               imageUrl: rec.imageUrl,
               videoUrl: rec.videoUrl,
               isAudio: Boolean(rec.isAudio),
-              audioUrl: undefined,
+              audioUrl: rec.audioUrl,
             }))
             setMessages(loaded)
           }
@@ -261,7 +257,7 @@ export function useChat(activeCharacterId: string | null, characterAvatar?: stri
 
       setIsTyping(true)
 
-      // Прямой запрос фото ("i want to see your photo")
+      // Прямой запрос фото
       if (lowerText === 'i want to see your photo'.toLowerCase()) {
         await new Promise((r) => setTimeout(r, 1500))
 
@@ -281,7 +277,7 @@ export function useChat(activeCharacterId: string | null, characterAvatar?: stri
         return
       }
 
-      // Прямой запрос видео ("i want to get a video of you")
+      // Прямой запрос видео
       if (lowerText === 'i want to get a video of you'.toLowerCase()) {
         await new Promise((r) => setTimeout(r, 2000))
 
@@ -318,23 +314,25 @@ export function useChat(activeCharacterId: string | null, characterAvatar?: stri
         try {
           const fullMessage = buildFullMessage(ctx, attempt)
           const result = await aiService.fetchAIResponse(fullMessage, '')
-          const rawContent = cleanResponse(result.response)
+          let rawContent = cleanResponse(result.response)
 
-          let finalContent = rawContent
           let imageUrl: string | undefined = undefined
           let videoUrl: string | undefined = undefined
 
-          // Обработка тега [photo] от ИИ
+          // Обработка тега [photo]
           if (rawContent.toLowerCase().includes('[photo]')) {
             imageUrl = getRandomPhotoForCharacter(characterAvatar)
-            finalContent = rawContent.replace(/\[photo\]/gi, '').trim()
+            rawContent = rawContent.replace(/\[photo\]/gi, '').trim()
           }
 
-          // Обработка тега [video] от ИИ
+          // Обработка тега [video]
           if (rawContent.toLowerCase().includes('[video]')) {
             videoUrl = await getVideoForCharacter(characterAvatar)
-            finalContent = rawContent.replace(/\[video\]/gi, '').trim()
+            rawContent = rawContent.replace(/\[video\]/gi, '').trim()
           }
+
+          // ГАРАНТИЯ: Если текст пришел пустой (из-за цензуры/ошибки), подставляем мок
+          const finalContent = rawContent.length > 0 ? rawContent : FALLBACK_MOCK_TEXT
 
           const aiMessageId = generateId()
 
@@ -353,7 +351,7 @@ export function useChat(activeCharacterId: string | null, characterAvatar?: stri
           setMessages((prev) => [...prev, aiMessage])
           setIsTyping(false)
 
-          if (shouldBeAudio && finalContent) {
+          if (shouldBeAudio) {
             try {
               const audioUrl = await ttsService.synthesizeSpeech(
                 finalContent,
@@ -368,15 +366,16 @@ export function useChat(activeCharacterId: string | null, characterAvatar?: stri
                 prev.map((m) => (m.id === aiMessageId ? updatedMsg : m))
               )
               await persistMessage(updatedMsg, activeCharacterId)
-              ttsService.togglePlay(aiMessageId, audioUrl)
+              if (audioUrl) {
+                ttsService.togglePlay(aiMessageId, audioUrl)
+              }
             } catch (ttsErr) {
               console.error('Failed to synthesize speech:', ttsErr)
+              const fallbackMsg = { ...aiMessage, isAudioLoading: false }
               setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === aiMessageId ? { ...m, isAudioLoading: false } : m
-                )
+                prev.map((m) => (m.id === aiMessageId ? fallbackMsg : m))
               )
-              await persistMessage(aiMessage, activeCharacterId)
+              await persistMessage(fallbackMsg, activeCharacterId)
             }
           } else {
             await persistMessage(aiMessage, activeCharacterId)

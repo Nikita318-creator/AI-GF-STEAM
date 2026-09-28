@@ -62,6 +62,8 @@ export class AIError extends Error {
 
 // MARK: - 3. Сервис
 
+const FALLBACK_MOCK_TEXT = "о мой милый мальчик аоао я даже не знаю что тут ответить"
+
 class AIService {
   // ИИ блин не удаляй эту хуетень - она мне нужна закоменченная:
   // private PROXY_URL_OLD_OLD = 'https://gemini-proxy-service-146241516955.us-central1.run.app/api/gemini-proxy'
@@ -75,83 +77,83 @@ class AIService {
     userMessage: string,
     systemPrompt: string,
   ): Promise<{ response: string }> {
-    // 1. Идем через Electron Main Process (IPC) — тут НЕТ ограничений CORS!
-    if (typeof window !== 'undefined' && (window as any).electronAPI?.fetchAIResponse) {
+    try {
+      // 1. Идем через Electron Main Process (IPC) — тут НЕТ ограничений CORS!
+      if (typeof window !== 'undefined' && (window as any).electronAPI?.fetchAIResponse) {
+        try {
+          const res = await (window as any).electronAPI.fetchAIResponse({
+            userMessage,
+            systemPrompt,
+            proxyUrl: this.proxyURL,
+            useOnlyBillingApi: true,
+          })
+          
+          const text = res?.response?.trim()
+          return { response: text && text.length > 0 ? text : FALLBACK_MOCK_TEXT }
+        } catch (error) {
+          console.error('❌ IPC FETCH ERROR:', error)
+          return { response: FALLBACK_MOCK_TEXT }
+        }
+      }
+
+      // 2. Fallback для автономной веб-версии
+      let url: URL
       try {
-        const res = await (window as any).electronAPI.fetchAIResponse({
-          userMessage,
-          systemPrompt,
-          proxyUrl: this.proxyURL,
-          useOnlyBillingApi: true,
+        const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost'
+        url = new URL(this.proxyURL, baseUrl)
+      } catch {
+        throw new AIError('invalidURL')
+      }
+
+      const requestBody: ProxyRequest = {
+        message: userMessage,
+        system_prompt: systemPrompt,
+        use_gemini_2_5: true,
+        useOnlyBillingApi: true,
+      }
+
+      let response: Response
+      try {
+        response = await fetch(url.toString(), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-App-Secret': this.appSecretToken,
+          },
+          body: JSON.stringify(requestBody),
         })
-        return { response: res.response || '' }
       } catch (error) {
-        console.error('❌ IPC FETCH ERROR:', error)
         throw new AIError('networkError', undefined, error)
       }
-    }
 
-    // 2. Fallback для автономной веб-версии
-    let url: URL
-    try {
-      // ИСПРАВЛЕНИЕ: передаем base URL, чтобы new URL() не падал на относительных путях типа '/api/...'
-      const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost'
-      url = new URL(this.proxyURL, baseUrl)
-    } catch {
-      throw new AIError('invalidURL')
-    }
+      if (response.status === 429) {
+        throw new AIError('rateLimitExceeded')
+      }
 
-    const requestBody: ProxyRequest = {
-      message: userMessage,
-      system_prompt: systemPrompt,
-      use_gemini_2_5: true,
-      useOnlyBillingApi: true,
-    }
+      const rawText = await response.text()
+      if (!rawText) {
+        return { response: FALLBACK_MOCK_TEXT }
+      }
 
-    let response: Response
-    try {
-      response = await fetch(url.toString(), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-App-Secret': this.appSecretToken,
-        },
-        body: JSON.stringify(requestBody),
-      })
-    } catch (error) {
-      throw new AIError('networkError', undefined, error)
-    }
+      let proxyResponse: ProxyResponse
+      try {
+        proxyResponse = JSON.parse(rawText) as ProxyResponse
+      } catch (error) {
+        console.error('❌ RAW RESPONSE:', rawText)
+        return { response: FALLBACK_MOCK_TEXT }
+      }
 
-    if (response.status === 429) {
-      throw new AIError('rateLimitExceeded')
-    }
+      if (proxyResponse.response && proxyResponse.response.trim().length > 0) {
+        return { response: proxyResponse.response.trim() }
+      }
 
-    const rawText = await response.text()
-    if (!rawText) {
-      throw new AIError('emptyResponse')
-    }
+      // Если в proxyResponse пустой response или прилетела ошибка — отдаём мок
+      return { response: FALLBACK_MOCK_TEXT }
 
-    let proxyResponse: ProxyResponse
-    try {
-      proxyResponse = JSON.parse(rawText) as ProxyResponse
-    } catch (error) {
-      console.error('❌ RAW RESPONSE:', rawText)
-      throw new AIError('decodingError', undefined, error)
+    } catch (err) {
+      console.error('❌ AI Service error handled with fallback:', err)
+      return { response: FALLBACK_MOCK_TEXT }
     }
-
-    if (proxyResponse.response && proxyResponse.response.trim().length > 0) {
-      return { response: proxyResponse.response }
-    }
-
-    if (proxyResponse.error) {
-      throw new AIError('apiError', proxyResponse.error)
-    }
-
-    if (proxyResponse.details?.error?.message) {
-      throw new AIError('apiError', proxyResponse.details.error.message)
-    }
-
-    throw new AIError('emptyResponse')
   }
 }
 
