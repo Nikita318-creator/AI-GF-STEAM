@@ -104,6 +104,7 @@ export function App() {
                 onSend={sendMessage}
                 disabled={isTyping || !isReady}
                 isAudioMode={isAudioMode}
+                avatar={activeCharacter?.avatar}
               />
             </main>
           </>

@@ -4,6 +4,7 @@ interface ChatInputProps {
   onSend: (message: string) => void
   disabled?: boolean
   isAudioMode?: boolean
+  avatar?: string // Передаем текущий аватар (например, "21.jpg" или "/avatars/21.jpg")
 }
 
 const BASE_PROMPT_SUGGESTIONS = [
@@ -11,12 +12,32 @@ const BASE_PROMPT_SUGGESTIONS = [
   "I want to get a video of you",
 ]
 
-export function ChatInput({ onSend, disabled, isAudioMode = false }: ChatInputProps) {
+export function ChatInput({ onSend, disabled, isAudioMode = false, avatar }: ChatInputProps) {
   const [value, setValue] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
+  // Вспомогательная функция проверки диапазона 21..26
+  const isVideoHidden = () => {
+    if (!avatar) return false
+    const fileName = avatar.split('/').pop()?.toLowerCase() || ''
+    const match = fileName.match(/^(\d+)\.jpg$/)
+    if (match) {
+      const num = parseInt(match[1], 10)
+      return num >= 21 && num <= 26
+    }
+    return false
+  }
+
+  // Фильтруем базовые промпты: если диапазон 21..26, убираем запрос видео
+  const filteredBasePrompts = BASE_PROMPT_SUGGESTIONS.filter((prompt) => {
+    if (isVideoHidden() && prompt === "I want to get a video of you") {
+      return false
+    }
+    return true
+  })
+
   const promptSuggestions = [
-    ...BASE_PROMPT_SUGGESTIONS,
+    ...filteredBasePrompts,
     isAudioMode ? "Can you send text messages" : "Can you send voice messages",
   ]
 
