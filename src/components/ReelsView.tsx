@@ -35,7 +35,7 @@ const REALISTIC_NICKNAMES = [
   'no_context_m',
   'draining.core',
   'night.drive.vibes',
-  'main.character. energy',
+  'main.character.energy',
   'sad_boy_club',
   'latenight.thoughts',
   'cozy_corner',
@@ -82,7 +82,6 @@ function getRandomReel(pool: ReelItem[] | string[], indexOffset: number): ReelIt
   const raw = pool[Math.floor(Math.random() * pool.length)]
   const url = typeof raw === 'string' ? raw : raw.url
   
-  // Жестко перезаписываем любые старые моки Girlfriend/friend
   let authorName = typeof raw === 'string' ? randomNick : raw.authorName
   if (!authorName || authorName.toLowerCase().includes('friend')) {
     authorName = randomNick
@@ -110,6 +109,11 @@ export const ReelsView: React.FC<ReelsViewProps> = ({ reels: initialReels = [] }
 
   const containerRef = useRef<HTMLDivElement>(null)
   const sourcePoolRef = useRef<ReelItem[] | string[]>(feedPool)
+  
+  const isDraggingRef = useRef(false)
+  const hasDraggedRef = useRef(false)
+  const startYRef = useRef(0)
+  const [isDragging, setIsDragging] = useState(false)
 
   useEffect(() => {
     if (window.YT && window.YT.Player) {
@@ -170,6 +174,54 @@ export const ReelsView: React.FC<ReelsViewProps> = ({ reels: initialReels = [] }
     }
   }
 
+  // --- МЫШИНЫЙ DRAG / SWIPE С ФИЛЬТРАЦИЕЙ КЛИКА ---
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return
+    isDraggingRef.current = true
+    hasDraggedRef.current = false
+    startYRef.current = e.clientY
+    setIsDragging(true)
+  }
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDraggingRef.current) return
+    const deltaY = Math.abs(startYRef.current - e.clientY)
+    if (deltaY > 8) {
+      hasDraggedRef.current = true
+    }
+  }
+
+  const handleMouseUp = (e: React.MouseEvent) => {
+    if (!isDraggingRef.current || !containerRef.current) return
+    isDraggingRef.current = false
+    setIsDragging(false)
+
+    const deltaY = startYRef.current - e.clientY
+    const SWIPE_THRESHOLD = 50
+
+    const height = containerRef.current.clientHeight
+    if (height === 0) return
+
+    if (Math.abs(deltaY) > SWIPE_THRESHOLD) {
+      let targetIndex = activeIndex
+      if (deltaY > 0) {
+        targetIndex = Math.min(activeIndex + 1, items.length - 1)
+      } else {
+        targetIndex = Math.max(activeIndex - 1, 0)
+      }
+
+      containerRef.current.scrollTo({
+        top: targetIndex * height,
+        behavior: 'smooth',
+      })
+    }
+  }
+
+  const handleMouseLeave = () => {
+    isDraggingRef.current = false
+    setIsDragging(false)
+  }
+
   const handleVideoError = useCallback(
     (failedIndex: number, reason: string) => {
       console.warn(`🚨 [ReelsView] Auto-skipping video at index [${failedIndex}]. Reason: ${reason}`)
@@ -221,7 +273,13 @@ export const ReelsView: React.FC<ReelsViewProps> = ({ reels: initialReels = [] }
     <div
       ref={containerRef}
       onScroll={handleScroll}
-      className="h-full w-full overflow-y-snap snap-y snap-mandatory overflow-y-auto bg-black relative select-none"
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseLeave}
+      className={`h-full w-full overflow-y-snap snap-y snap-mandatory overflow-y-auto bg-black relative select-none ${
+        isDragging ? 'cursor-grabbing' : 'cursor-grab'
+      }`}
     >
       {items.map((reel, index) => (
         <ReelCard
@@ -232,6 +290,7 @@ export const ReelsView: React.FC<ReelsViewProps> = ({ reels: initialReels = [] }
           isActive={index === activeIndex}
           isApiReady={isApiReady}
           isMuted={isMuted}
+          hasDraggedRef={hasDraggedRef}
           onToggleMute={handleToggleMuteGlobal}
           isLiked={!!likedMap[reel.id]}
           likesCount={likesCountMap[reel.id] ?? reel.likesCount ?? 0}
@@ -250,6 +309,7 @@ interface ReelCardProps {
   isActive: boolean
   isApiReady: boolean
   isMuted: boolean
+  hasDraggedRef: React.MutableRefObject<boolean>
   onToggleMute: () => void
   isLiked: boolean
   likesCount: number
@@ -264,6 +324,7 @@ const ReelCard: React.FC<ReelCardProps> = memo(({
   isActive,
   isApiReady,
   isMuted,
+  hasDraggedRef,
   onToggleMute,
   isLiked,
   likesCount,
@@ -343,6 +404,12 @@ const ReelCard: React.FC<ReelCardProps> = memo(({
   }, [isActive, isApiReady, videoId])
 
   const handleTogglePlay = () => {
+    // Если был драг/свайп — игнорируем клик и не ставим на паузу!
+    if (hasDraggedRef.current) {
+      hasDraggedRef.current = false
+      return
+    }
+
     if (!playerRef.current) return
     const nextPlaying = !isPlaying
     setIsPlaying(nextPlaying)
@@ -428,7 +495,7 @@ const ReelCard: React.FC<ReelCardProps> = memo(({
           </div>
         )}
 
-        {/* Прозрачное одеяло для Play/Pause */}
+        {/* Прозрачное одеяло для Play/Pause (игнорирует драг) */}
         <div onClick={handleTogglePlay} className="absolute inset-0 cursor-pointer z-10" />
 
         {/* Иконка паузы по центру */}
@@ -477,7 +544,7 @@ const ReelCard: React.FC<ReelCardProps> = memo(({
 
         {isFirst && isActive && showScrollHint && (
           <div className="absolute top-20 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center gap-1 bg-black/60 px-4 py-2 rounded-full backdrop-blur-md animate-bounce pointer-events-none transition-opacity duration-500 border border-white/10">
-            <span className="text-xs text-white/90 font-medium">Scroll down for next video</span>
+            <span className="text-xs text-white/90 font-medium">Scroll or drag to change video</span>
             <ChevronDownIcon className="h-4 w-4 text-white/90" />
           </div>
         )}

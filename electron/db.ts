@@ -68,6 +68,7 @@ try {
 } catch {}
 
 const defaultCharacters: CharacterRecord[] = [
+  // AI Girls (1-10)
   { id: 'sakura', name: 'Sakura', avatar: '/avatars/1.jpg', mood: 'Missing you...' },
   { id: 'yuki', name: 'Yuki', avatar: '/avatars/2.jpg', mood: 'Thinking about you...' },
   { id: 'hana', name: 'Hana', avatar: '/avatars/3.jpg', mood: 'Wants to talk...' },
@@ -78,6 +79,28 @@ const defaultCharacters: CharacterRecord[] = [
   { id: 'hinata', name: 'Hinata', avatar: '/avatars/8.jpg', mood: 'Cooking dinner...' },
   { id: 'akane', name: 'Akane', avatar: '/avatars/9.jpg', mood: 'On a walk...' },
   { id: 'kuro', name: 'Kuro', avatar: '/avatars/10.jpg', mood: 'Chilling...' },
+
+  // Anime (11-20)
+  { id: 'anime_11', name: 'Nami', avatar: '/avatars/11.jpg', mood: 'Navigating...' },
+  { id: 'anime_12', name: 'Zero Two', avatar: '/avatars/12.jpg', mood: 'Darling~' },
+  { id: 'anime_13', name: 'Power', avatar: '/avatars/13.jpg', mood: 'Meowy is hungry' },
+  { id: 'anime_14', name: 'Makima', avatar: '/avatars/14.jpg', mood: 'Looking at you...' },
+  { id: 'anime_15', name: 'Marin', avatar: '/avatars/15.jpg', mood: 'Making cosplay!' },
+  { id: 'anime_16', name: 'Yor', avatar: '/avatars/16.jpg', mood: 'Cooking dinner...' },
+  { id: 'anime_17', name: 'Chika', avatar: '/avatars/17.jpg', mood: 'Playing board games' },
+  { id: 'anime_18', name: 'Megumin', avatar: '/avatars/18.jpg', mood: 'Charging explosion magic' },
+  { id: 'anime_19', name: 'Tohru', avatar: '/avatars/19.jpg', mood: 'Baking for you...' },
+  { id: 'anime_20', name: 'Shoko', avatar: '/avatars/20.jpg', mood: 'Reading a book' },
+
+  // MILF (21-25)
+  { id: 'milf_21', name: 'Victoria', avatar: '/avatars/21.jpg', mood: 'Sipping wine...' },
+  { id: 'milf_22', name: 'Samantha', avatar: '/avatars/22.jpg', mood: 'In the office' },
+  { id: 'milf_23', name: 'Monica', avatar: '/avatars/23.jpg', mood: 'Relaxing at home' },
+  { id: 'milf_24', name: 'Beatrice', avatar: '/avatars/24.jpg', mood: 'Listening to jazz' },
+  { id: 'milf_25', name: 'Diana', avatar: '/avatars/25.jpg', mood: 'Working on art' },
+
+  // Ex (26)
+  { id: 'ex_26', name: 'Chloe', avatar: '/avatars/26.jpg', mood: 'Up at 2 AM...' },
 ]
 
 const insertStmt = db.prepare('INSERT OR REPLACE INTO characters (id, name, avatar, mood) VALUES (?, ?, ?, ?)')
