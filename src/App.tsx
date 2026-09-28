@@ -10,7 +10,7 @@ import { useChat } from '@/hooks/useChat'
 import { ttsService } from '@/services/ttsService'
 import { feedPool, friendsPool } from '@/components/feedVM'
 import type { CharacterRecord, MessageRecord, Character } from '@/types/chat'
- 
+
 export function App() {
   const [activeTab, setActiveTab] = useState<TabType>('chats')
   const [selectedCharId, setSelectedCharId] = useState<string | null>(null)
