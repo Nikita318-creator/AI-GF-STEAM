@@ -18,26 +18,43 @@ if (!existsSync(videosCacheDir)) {
   mkdirSync(videosCacheDir, { recursive: true })
 }
 
-// Генерация списка ссылок (аналог Swift логики)
+// Генерация списка ссылок
 const allLinksBlond = Array.from({ length: 94 }, (_, i) => 
   `https://raw.githubusercontent.com/npanezai9-ux/vidiosAIGF/main/blondvid/blondVid${i + 1}.mp4`
 )
 const allLinksBrunet = Array.from({ length: 99 }, (_, i) => 
   `https://raw.githubusercontent.com/npanezai9-ux/vidiosAIGF/main/brunetvid/brunetVid${i + 1}.mp4`
 )
-const allLinks = [...allLinksBlond, ...allLinksBrunet]
+// Новая категория anime: ссылки от rolVid11.mp4 до rolVid20.mp4
+const allLinksAnime = Array.from({ length: 10 }, (_, i) => 
+  `https://raw.githubusercontent.com/uvarovn771-blip/anime_rol/main/rolVid${i + 11}.mp4`
+)
+
+const allLinks = [...allLinksBlond, ...allLinksBrunet, ...allLinksAnime]
 
 function selectVideoUrl(avatar?: string): string {
   const fileName = avatar?.split('/').pop()?.toLowerCase() || ''
-  let category: 'blond' | 'brunet' | 'all' = 'all'
+  let category: 'blond' | 'brunet' | 'anime' | 'all' = 'all'
+
+  // Список аватарок для аниме: 11.jpg, 12.jpg, ..., 20.jpg
+  const animeAvatars = Array.from({ length: 10 }, (_, i) => `${i + 11}.jpg`)
 
   if (['1.jpg', '2.jpg', '4.jpg', '7.jpg', '10.jpg'].includes(fileName)) {
     category = 'blond'
   } else if (['3.jpg', '5.jpg', '6.jpg', '8.jpg', '9.jpg'].includes(fileName)) {
     category = 'brunet'
+  } else if (animeAvatars.includes(fileName)) {
+    category = 'anime'
   }
 
-  const pool = category === 'blond' ? allLinksBlond : category === 'brunet' ? allLinksBrunet : allLinks
+  const pool = category === 'blond' 
+    ? allLinksBlond 
+    : category === 'brunet' 
+    ? allLinksBrunet 
+    : category === 'anime' 
+    ? allLinksAnime 
+    : allLinks
+
   return pool[Math.floor(Math.random() * pool.length)]
 }
 

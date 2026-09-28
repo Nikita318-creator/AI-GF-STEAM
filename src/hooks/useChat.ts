@@ -41,14 +41,14 @@ function getRandomPhotoForCharacter(avatarPath?: string): string {
 
   switch (category) {
     case 'anime': {
-      // Пример диапазона/пути для аниме
-      const randomNum = Math.floor(Math.random() * 50) + 1
-      return `/photos/anime${randomNum}.jpg`
+      // У каждого персонажа (avatarNum) 20 уникальных фоток в общей папке (от 1 до 20)
+      const randomPhotoNum = Math.floor(Math.random() * 20) + 1
+      return `/photos/${avatarNum}_${randomPhotoNum}.jpg`
     }
     case 'milf': {
       // Пример диапазона/пути для MILF
-      const randomNum = Math.floor(Math.random() * 40) + 1
-      return `/photos/milf${randomNum}.jpg`
+      const randomPhotoNum = Math.floor(Math.random() * 15) + 1
+      return `/photos/${avatarNum}_${randomPhotoNum}.jpg`
     }
     case 'ex': {
       // Пример диапазона/пути для Ex
