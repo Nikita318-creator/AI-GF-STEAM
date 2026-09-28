@@ -10,6 +10,8 @@ import {
   getSystemPrompt,
 } from '@/constants/prompts'
 
+export type CharacterCategory = 'gf' | 'anime' | 'milf' | 'ex'
+
 function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 }
@@ -18,25 +20,90 @@ function cleanResponse(text: string): string {
   return text.replace(/\[video\]/g, '').replace(/\[photo\]/g, '').trim()
 }
 
+export function getAvatarNumber(avatarPath?: string): number {
+  if (!avatarPath) return 0
+  const fileName = avatarPath.split('/').pop() || ''
+  const num = parseInt(fileName, 10)
+  return isNaN(num) ? 0 : num
+}
+
+export function getCharacterCategory(avatarPath?: string): CharacterCategory {
+  const num = getAvatarNumber(avatarPath)
+  if (num >= 11 && num <= 20) return 'anime'
+  if (num >= 21 && num <= 25) return 'milf'
+  if (num === 26) return 'ex'
+  return 'gf'
+}
+
 function getRandomPhotoForCharacter(avatarPath?: string): string {
-  if (!avatarPath) {
-    const randomNum = Math.floor(Math.random() * 124) + 1
-    return `/photos/pic${randomNum}.jpg`
+  const category = getCharacterCategory(avatarPath)
+  const avatarNum = getAvatarNumber(avatarPath)
+
+  switch (category) {
+    case 'anime': {
+      // Пример диапазона/пути для аниме
+      const randomNum = Math.floor(Math.random() * 50) + 1
+      return `/photos/anime${randomNum}.jpg`
+    }
+    case 'milf': {
+      // Пример диапазона/пути для MILF
+      const randomNum = Math.floor(Math.random() * 40) + 1
+      return `/photos/milf${randomNum}.jpg`
+    }
+    case 'ex': {
+      // Пример диапазона/пути для Ex
+      const randomNum = Math.floor(Math.random() * 32) + 1
+      return `/photos/ex${randomNum}.jpg`
+    }
+    case 'gf':
+    default: {
+      // Существующая логика блондинка / брюнетка для реальных аватарок (1..10)
+      const blondeAvatars = [1, 2, 4, 7, 10]
+      const brunetteAvatars = [3, 5, 6, 8, 9]
+
+      if (blondeAvatars.includes(avatarNum)) {
+        const randomNum = Math.floor(Math.random() * 124) + 1
+        return `/photos/pic${randomNum}.jpg`
+      } else if (brunetteAvatars.includes(avatarNum)) {
+        const randomNum = Math.floor(Math.random() * 115) + 1
+        return `/photos/photo${randomNum}.jpg`
+      } else {
+        const randomNum = Math.floor(Math.random() * 124) + 1
+        return `/photos/pic${randomNum}.jpg`
+      }
+    }
+  }
+}
+
+async function getVideoForCharacter(avatarPath?: string): Promise<string | undefined> {
+  const category = getCharacterCategory(avatarPath)
+  const api = typeof window !== 'undefined' ? (window.electronAPI as any) : undefined
+
+  // Если Electron API поддерживает передачу категории:
+  if (api && typeof api.getVideo === 'function') {
+    const fetchedUrl = await api.getVideo(avatarPath, category)
+    if (fetchedUrl) return fetchedUrl
   }
 
-  const fileName = avatarPath.split('/').pop()?.toLowerCase() || ''
-  const blondeAvatars = ['1.jpg', '2.jpg', '4.jpg', '7.jpg', '10.jpg']
-  const brunetteAvatars = ['3.jpg', '5.jpg', '6.jpg', '8.jpg', '9.jpg']
-
-  if (blondeAvatars.includes(fileName)) {
-    const randomNum = Math.floor(Math.random() * 124) + 1
-    return `/photos/pic${randomNum}.jpg`
-  } else if (brunetteAvatars.includes(fileName)) {
-    const randomNum = Math.floor(Math.random() * 115) + 1
-    return `/photos/photo${randomNum}.jpg`
-  } else {
-    const randomNum = Math.floor(Math.random() * 124) + 1
-    return `/photos/pic${randomNum}.jpg`
+  // Фоллбек на локальные папки в зависимости от категории
+  switch (category) {
+    case 'anime': {
+      const randomNum = Math.floor(Math.random() * 10) + 1
+      return `/videos/anime/video${randomNum}.mp4`
+    }
+    case 'milf': {
+      const randomNum = Math.floor(Math.random() * 10) + 1
+      return `/videos/milf/video${randomNum}.mp4`
+    }
+    case 'ex': {
+      const randomNum = Math.floor(Math.random() * 10) + 1
+      return `/videos/ex/video${randomNum}.mp4`
+    }
+    case 'gf':
+    default: {
+      const randomNum = Math.floor(Math.random() * 10) + 1
+      return `/videos/real/video${randomNum}.mp4`
+    }
   }
 }
 
@@ -84,16 +151,14 @@ export function useChat(activeCharacterId: string | null, characterAvatar?: stri
   const messagesRef = useRef<Message[]>([])
   messagesRef.current = messages
 
-  const isAudioModeRef = useRef<boolean>(false)
-  isAudioModeRef.current = isAudioMode
-
   const persistMessage = async (msg: Message, charId: string) => {
     const api = typeof window !== 'undefined' ? (window.electronAPI as any) : undefined
     if (api && typeof api.saveMessage === 'function') {
       try {
-        const rawTimestamp = msg.timestamp instanceof Date 
-          ? msg.timestamp.getTime() 
-          : Number(msg.timestamp) || Date.now()
+        const rawTimestamp =
+          msg.timestamp instanceof Date
+            ? msg.timestamp.getTime()
+            : Number(msg.timestamp) || Date.now()
 
         await api.saveMessage({
           id: msg.id,
@@ -104,7 +169,7 @@ export function useChat(activeCharacterId: string | null, characterAvatar?: stri
           imageUrl: msg.imageUrl,
           videoUrl: msg.videoUrl,
           isAudio: msg.isAudio ? 1 : 0,
-          audioUrl: undefined, // Никогда не сохраняем мертвые blob-ссылки в базу данных
+          audioUrl: undefined,
         })
       } catch (err) {
         console.error('Failed to persist message to SQLite:', err)
@@ -114,7 +179,6 @@ export function useChat(activeCharacterId: string | null, characterAvatar?: stri
 
   useEffect(() => {
     async function loadHistory() {
-      // При смене персонажа или выходе из чата сбрасываем режим аудио
       setIsAudioMode(false)
 
       if (!activeCharacterId) {
@@ -136,7 +200,7 @@ export function useChat(activeCharacterId: string | null, characterAvatar?: stri
               imageUrl: rec.imageUrl,
               videoUrl: rec.videoUrl,
               isAudio: Boolean(rec.isAudio),
-              audioUrl: undefined, // Очищаем протухшие blob-ссылки при загрузке из базы
+              audioUrl: undefined,
             }))
             setMessages(loaded)
           }
@@ -152,200 +216,197 @@ export function useChat(activeCharacterId: string | null, characterAvatar?: stri
     loadHistory()
   }, [activeCharacterId])
 
-  const sendMessage = useCallback(async (text: string) => {
-    if (!activeCharacterId) return
+  const sendMessage = useCallback(
+    async (text: string) => {
+      if (!activeCharacterId) return
 
-    let currentLayout = 'en-US'
-    const api = typeof window !== 'undefined' ? (window.electronAPI as any) : undefined
-    if (api && typeof api.getKeyboardLayout === 'function') {
-      try {
-        currentLayout = await api.getKeyboardLayout()
-      } catch (err) {
-        console.error('Failed to get layout:', err)
+      let currentLayout = 'en-US'
+      const api = typeof window !== 'undefined' ? (window.electronAPI as any) : undefined
+      if (api && typeof api.getKeyboardLayout === 'function') {
+        try {
+          currentLayout = await api.getKeyboardLayout()
+        } catch (err) {
+          console.error('Failed to get layout:', err)
+        }
       }
-    }
 
-    const lowerText = text.trim().toLowerCase()
+      const lowerText = text.trim().toLowerCase()
+      let newAudioMode = isAudioMode
 
-    // Сначала определяем целевой режим с учетом мгновенного клика по подсказке
-    let newAudioMode = isAudioMode
+      if (lowerText === 'can you send voice messages'.toLowerCase()) {
+        newAudioMode = true
+        setIsAudioMode(true)
+      } else if (lowerText === 'can you send text messages'.toLowerCase()) {
+        newAudioMode = false
+        setIsAudioMode(false)
+      }
 
-    if (lowerText === 'can you send voice messages'.toLowerCase()) {
-      newAudioMode = true
-      setIsAudioMode(true)
-    } else if (lowerText === 'can you send text messages'.toLowerCase()) {
-      newAudioMode = false
-      setIsAudioMode(false)
-    }
+      const shouldBeAudio =
+        newAudioMode || lowerText === 'can you send voice messages'.toLowerCase()
 
-    // Определяем, должно ли текущее сообщение быть аудио
-    const shouldBeAudio = newAudioMode || lowerText === 'can you send voice messages'.toLowerCase()
+      const dynamicPrompt = getSystemPrompt(currentLayout)
+      const currentMessages = messagesRef.current
+      const formattedHistory = formatChatHistory(currentMessages)
 
-    const dynamicPrompt = getSystemPrompt(currentLayout)
-    const currentMessages = messagesRef.current
-    const formattedHistory = formatChatHistory(currentMessages)
-
-    const userMessage: Message = {
-      id: generateId(),
-      role: 'user',
-      content: text,
-      timestamp: new Date(),
-      characterId: activeCharacterId,
-    }
-
-    setMessages((prev) => [...prev, userMessage])
-    await persistMessage(userMessage, activeCharacterId)
-
-    setIsTyping(true)
-
-    if (lowerText === 'i want to see your photo'.toLowerCase()) {
-      await new Promise((r) => setTimeout(r, 1500))
-
-      const imageUrl = getRandomPhotoForCharacter(characterAvatar)
-      const aiMessage: Message = {
+      const userMessage: Message = {
         id: generateId(),
-        role: 'assistant',
-        content: '',
+        role: 'user',
+        content: text,
         timestamp: new Date(),
         characterId: activeCharacterId,
-        imageUrl: imageUrl,
       }
 
-      setMessages((prev) => [...prev, aiMessage])
-      await persistMessage(aiMessage, activeCharacterId)
-      setIsTyping(false)
-      return
-    }
+      setMessages((prev) => [...prev, userMessage])
+      await persistMessage(userMessage, activeCharacterId)
 
-    if (lowerText === 'i want to get a video of you'.toLowerCase()) {
-      await new Promise((r) => setTimeout(r, 2000))
+      setIsTyping(true)
 
-      let videoUrl: string | undefined = undefined
+      // Прямой запрос фото ("i want to see your photo")
+      if (lowerText === 'i want to see your photo'.toLowerCase()) {
+        await new Promise((r) => setTimeout(r, 1500))
 
-      if (api && typeof api.getVideo === 'function') {
-        const fetchedUrl = await api.getVideo(characterAvatar)
-        if (fetchedUrl) videoUrl = fetchedUrl
-      }
-
-      const aiMessage: Message = {
-        id: generateId(),
-        role: 'assistant',
-        content: '',
-        timestamp: new Date(),
-        characterId: activeCharacterId,
-        videoUrl: videoUrl,
-      }
-
-      setMessages((prev) => [...prev, aiMessage])
-      await persistMessage(aiMessage, activeCharacterId)
-      setIsTyping(false)
-      return
-    }
-
-    const ctx: RetryContext = {
-      systemPrompt: dynamicPrompt,
-      previousMessages: formattedHistory,
-      userText: text,
-    }
-
-    let lastError: unknown
-
-    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-      if (attempt > 0) {
-        await new Promise((r) => setTimeout(r, 1000))
-      }
-
-      try {
-        const fullMessage = buildFullMessage(ctx, attempt)
-        const result = await aiService.fetchAIResponse(fullMessage, '')
-        const rawContent = cleanResponse(result.response)
-
-        let finalContent = rawContent
-        let imageUrl: string | undefined = undefined
-        let videoUrl: string | undefined = undefined
-
-        if (rawContent.toLowerCase().includes('[photo]')) {
-          imageUrl = getRandomPhotoForCharacter(characterAvatar)
-          finalContent = rawContent.replace(/\[photo\]/gi, '').trim()
-        }
-
-        if (rawContent.toLowerCase().includes('[video]')) {
-          if (api && typeof api.getVideo === 'function') {
-            videoUrl = await api.getVideo(characterAvatar) ?? undefined
-          }
-          finalContent = rawContent.replace(/\[video\]/gi, '').trim()
-        }
-
-        const aiMessageId = generateId()
-
-        // Создаем ИИ-сообщение
+        const imageUrl = getRandomPhotoForCharacter(characterAvatar)
         const aiMessage: Message = {
-          id: aiMessageId,
+          id: generateId(),
           role: 'assistant',
-          content: finalContent,
+          content: '',
           timestamp: new Date(),
           characterId: activeCharacterId,
           imageUrl: imageUrl,
-          videoUrl: videoUrl,
-          isAudio: shouldBeAudio,
-          isAudioLoading: shouldBeAudio,
         }
 
         setMessages((prev) => [...prev, aiMessage])
+        await persistMessage(aiMessage, activeCharacterId)
         setIsTyping(false)
+        return
+      }
 
-        // Если активен аудио-режим или был специальный запрос, генерируем речь
-        if (shouldBeAudio && finalContent) {
-          try {
-            const audioUrl = await ttsService.synthesizeSpeech(finalContent, currentLayout)
-            const updatedMsg = {
-              ...aiMessage,
-              audioUrl,
-              isAudioLoading: false,
-            }
-            setMessages((prev) =>
-              prev.map((m) => (m.id === aiMessageId ? updatedMsg : m))
-            )
-            await persistMessage(updatedMsg, activeCharacterId)
-            
-            // Автоматически проигрываем
-            ttsService.togglePlay(aiMessageId, audioUrl)
-          } catch (ttsErr) {
-            console.error('Failed to synthesize speech:', ttsErr)
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === aiMessageId ? { ...m, isAudioLoading: false } : m
-              )
-            )
-            await persistMessage(aiMessage, activeCharacterId)
-          }
-        } else {
-          await persistMessage(aiMessage, activeCharacterId)
+      // Прямой запрос видео ("i want to get a video of you")
+      if (lowerText === 'i want to get a video of you'.toLowerCase()) {
+        await new Promise((r) => setTimeout(r, 2000))
+
+        const videoUrl = await getVideoForCharacter(characterAvatar)
+
+        const aiMessage: Message = {
+          id: generateId(),
+          role: 'assistant',
+          content: '',
+          timestamp: new Date(),
+          characterId: activeCharacterId,
+          videoUrl: videoUrl,
         }
 
+        setMessages((prev) => [...prev, aiMessage])
+        await persistMessage(aiMessage, activeCharacterId)
+        setIsTyping(false)
         return
-      } catch (error) {
-        lastError = error
       }
-    }
 
-    const errorText =
-      lastError instanceof AIError && lastError.code === 'rateLimitExceeded'
-        ? RATE_LIMIT_ERROR_TEXT
-        : GENERIC_ERROR_TEXT
+      const ctx: RetryContext = {
+        systemPrompt: dynamicPrompt,
+        previousMessages: formattedHistory,
+        userText: text,
+      }
 
-    const errorMessage: Message = {
-      id: generateId(),
-      role: 'assistant',
-      content: errorText,
-      timestamp: new Date(),
-      characterId: activeCharacterId,
-    }
+      let lastError: unknown
 
-    setMessages((prev) => [...prev, errorMessage])
-    await persistMessage(errorMessage, activeCharacterId)
-    setIsTyping(false)
-  }, [activeCharacterId, characterAvatar, isAudioMode])
+      for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+        if (attempt > 0) {
+          await new Promise((r) => setTimeout(r, 1000))
+        }
+
+        try {
+          const fullMessage = buildFullMessage(ctx, attempt)
+          const result = await aiService.fetchAIResponse(fullMessage, '')
+          const rawContent = cleanResponse(result.response)
+
+          let finalContent = rawContent
+          let imageUrl: string | undefined = undefined
+          let videoUrl: string | undefined = undefined
+
+          // Обработка тега [photo] от ИИ
+          if (rawContent.toLowerCase().includes('[photo]')) {
+            imageUrl = getRandomPhotoForCharacter(characterAvatar)
+            finalContent = rawContent.replace(/\[photo\]/gi, '').trim()
+          }
+
+          // Обработка тега [video] от ИИ
+          if (rawContent.toLowerCase().includes('[video]')) {
+            videoUrl = await getVideoForCharacter(characterAvatar)
+            finalContent = rawContent.replace(/\[video\]/gi, '').trim()
+          }
+
+          const aiMessageId = generateId()
+
+          const aiMessage: Message = {
+            id: aiMessageId,
+            role: 'assistant',
+            content: finalContent,
+            timestamp: new Date(),
+            characterId: activeCharacterId,
+            imageUrl: imageUrl,
+            videoUrl: videoUrl,
+            isAudio: shouldBeAudio,
+            isAudioLoading: shouldBeAudio,
+          }
+
+          setMessages((prev) => [...prev, aiMessage])
+          setIsTyping(false)
+
+          if (shouldBeAudio && finalContent) {
+            try {
+              const audioUrl = await ttsService.synthesizeSpeech(
+                finalContent,
+                currentLayout
+              )
+              const updatedMsg = {
+                ...aiMessage,
+                audioUrl,
+                isAudioLoading: false,
+              }
+              setMessages((prev) =>
+                prev.map((m) => (m.id === aiMessageId ? updatedMsg : m))
+              )
+              await persistMessage(updatedMsg, activeCharacterId)
+              ttsService.togglePlay(aiMessageId, audioUrl)
+            } catch (ttsErr) {
+              console.error('Failed to synthesize speech:', ttsErr)
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === aiMessageId ? { ...m, isAudioLoading: false } : m
+                )
+              )
+              await persistMessage(aiMessage, activeCharacterId)
+            }
+          } else {
+            await persistMessage(aiMessage, activeCharacterId)
+          }
+
+          return
+        } catch (error) {
+          lastError = error
+        }
+      }
+
+      const errorText =
+        lastError instanceof AIError && lastError.code === 'rateLimitExceeded'
+          ? RATE_LIMIT_ERROR_TEXT
+          : GENERIC_ERROR_TEXT
+
+      const errorMessage: Message = {
+        id: generateId(),
+        role: 'assistant',
+        content: errorText,
+        timestamp: new Date(),
+        characterId: activeCharacterId,
+      }
+
+      setMessages((prev) => [...prev, errorMessage])
+      await persistMessage(errorMessage, activeCharacterId)
+      setIsTyping(false)
+    },
+    [activeCharacterId, characterAvatar, isAudioMode]
+  )
 
   return {
     messages,
