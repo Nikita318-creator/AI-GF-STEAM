@@ -116,7 +116,13 @@ export function App() {
                 onSelectChat={(id) => setSelectedCharId(id)}
               />
             )}
-            {activeTab === 'create' && <CreateGfView />}
+            {activeTab === 'create' && (
+  <CreateGfView
+    onSelectChat={(id) => {
+      setSelectedCharId(id)
+    }}
+  />
+)}
             {activeTab === 'reels' && (
               <div className="relative flex-1 h-full w-full">
                 {/* Шапка с подвкладками: Friends активна по дефолту */}

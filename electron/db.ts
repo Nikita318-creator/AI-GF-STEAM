@@ -161,5 +161,11 @@ export const dbService = {
       LIMIT 1
     `)
     return stmt.get(characterId) as MessageRecord | undefined
-  }
+  },
+
+  // Новый метод для сохранения созданной через онбординг девушки
+  addCharacter(char: CharacterRecord): void {
+    const stmt = db.prepare('INSERT OR REPLACE INTO characters (id, name, avatar, mood) VALUES (?, ?, ?, ?)')
+    stmt.run(char.id, char.name, char.avatar, char.mood || '')
+  },
 }
