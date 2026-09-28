@@ -72,7 +72,10 @@ export function MessageBubble({
         className={`flex animate-slide-up gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}
       >
         {!isUser && (
-          <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full ring-1 ring-white/10">
+          <div
+            className="h-8 w-8 shrink-0 overflow-hidden rounded-full ring-1 ring-white/10 cursor-pointer hover:opacity-80 transition-opacity"
+            onClick={() => setIsPhotoOpen(true)}
+          >
             <img
               src={characterAvatar}
               alt={characterName}
@@ -200,9 +203,9 @@ export function MessageBubble({
       </div>
 
       {/* Полноэкранные модалки */}
-      {isPhotoOpen && message.imageUrl && (
+      {isPhotoOpen && (
         <PhotoModal
-          imageUrl={message.imageUrl}
+          imageUrl={message.imageUrl || characterAvatar}
           onClose={() => setIsPhotoOpen(false)}
         />
       )}

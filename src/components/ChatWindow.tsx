@@ -1,7 +1,8 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useState } from 'react'
 import type { Message } from '@/types/chat'
 import { MessageBubble } from './MessageBubble'
 import { TypingIndicator } from './TypingIndicator'
+import { PhotoModal } from './PhotoModal'
 
 interface ChatWindowProps {
   messages: Message[]
@@ -19,6 +20,7 @@ export function ChatWindow({
   onBack,
 }: ChatWindowProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
+  const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false)
 
   // Аналог viewWillAppear / viewDidAppear в Swift: скроллим вниз при монтировании и изменении сообщений
   useEffect(() => {
@@ -57,7 +59,10 @@ export function ChatWindow({
               ←
             </button>
             <div className="flex items-center gap-3">
-              <div className="h-9 w-9 overflow-hidden rounded-full ring-1 ring-white/20">
+              <div
+                className="h-9 w-9 overflow-hidden rounded-full ring-1 ring-white/20 cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={() => setIsAvatarModalOpen(true)}
+              >
                 <img
                   src={characterAvatar}
                   alt={characterName}
@@ -85,7 +90,10 @@ export function ChatWindow({
         >
           {messages.length === 0 && (
             <div className="flex flex-1 flex-col items-center justify-center text-center">
-              <div className="mb-4 h-24 w-24 overflow-hidden rounded-full ring-4 ring-white/20 shadow-2xl">
+              <div
+                className="mb-4 h-24 w-24 overflow-hidden rounded-full ring-4 ring-white/20 shadow-2xl cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={() => setIsAvatarModalOpen(true)}
+              >
                 <img
                   src={characterAvatar}
                   alt={characterName}
@@ -110,6 +118,14 @@ export function ChatWindow({
           {isTyping && <TypingIndicator characterAvatar={characterAvatar} />}
         </div>
       </div>
+
+      {/* Полноэкранное фото аватарки */}
+      {isAvatarModalOpen && (
+        <PhotoModal
+          imageUrl={characterAvatar}
+          onClose={() => setIsAvatarModalOpen(false)}
+        />
+      )}
     </div>
   )
 }
