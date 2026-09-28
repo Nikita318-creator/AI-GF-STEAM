@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { CreateGfModal } from './CreateGfModal'
 
 export interface CreatedGf {
@@ -15,37 +15,104 @@ interface CreateGfViewProps {
   onSelectChat?: (characterId: string) => void
 }
 
+// Массив романтичных и живых фраз от ИИ-подружки
+const CREATIVE_DESCRIPTIONS = [
+  "Hey babe, I missed you so much today... Come chat with me! ❤️",
+  "I've been thinking about you all day long... What are we doing today?",
+  "Your personal cutie is online and ready to keep you company~ ✨",
+  "Ready to whisper sweet thoughts in your ear all night long...",
+  "Can't wait to hear about your day! Tell me everything, sweetheart 💕",
+  "Always here for you, no matter what. Let's make some memories!",
+  "Just waiting for my favorite human... Is that you? 😘",
+  "I saved a special warm smile just for you today~"
+]
+
 export function CreateGfView({ onSelectChat }: CreateGfViewProps) {
   const [gfs, setGfs] = useState<CreatedGf[]>([])
-  const [filterCategory, setFilterCategory] = useState<string>('All')
   const [isModalOpen, setIsModalOpen] = useState(false)
 
-  const toggleStatus = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation()
-    setGfs((prev) =>
-      prev.map((gf) =>
-        gf.id === id
-          ? { ...gf, status: gf.status === 'Active' ? 'Draft' : 'Active' }
-          : gf
-      )
-    )
+  // 1. Загрузка персонажей из базы при старте
+  // 1. Загрузка персонажей из базы при старте
+useEffect(() => {
+  const loadCharacters = async () => {
+    try {
+      if (window.electronAPI?.getCharacters) {
+        const dbChars = await window.electronAPI.getCharacters()
+        
+        const allowedAvatarRegex = /myGF[1-8](\.[a-z]+)?$/i
+
+        const formatted: CreatedGf[] = dbChars
+          .filter((char) => allowedAvatarRegex.test(char.avatar))
+          .map((char) => ({
+            id: char.id,
+            name: char.name,
+            role: 'Your Ideal AI Girlfriend',
+            category: 'AI Girls',
+            avatar: char.avatar,
+            status: 'Active',
+            // ВСЕГДА берем случайную фразу из массива, полностью игнорируя БД
+            description:
+              CREATIVE_DESCRIPTIONS[
+                Math.floor(Math.random() * CREATIVE_DESCRIPTIONS.length)
+              ],
+          }))
+
+        setGfs(formatted)
+      }
+    } catch (err) {
+      console.error('Failed to load characters from DB:', err)
+    }
   }
 
-  const handleCreatedNewGf = (newGf: CreatedGf) => {
-    setGfs((prev) => [newGf, ...prev])
-  }
+  loadCharacters()
+}, [])
 
-  const filteredGfs = gfs.filter((gf) =>
-    filterCategory === 'All' ? true : gf.category === filterCategory
-  )
+  // 2. Сохранение нового персонажа и первого сообщения
+  const handleCreatedNewGf = async (newGf: CreatedGf) => {
+    try {
+      if (window.electronAPI?.addCharacter) {
+        await window.electronAPI.addCharacter({
+          id: newGf.id,
+          name: newGf.name,
+          avatar: newGf.avatar,
+          mood: newGf.description,
+        })
+      }
+
+      if (window.electronAPI?.saveMessage) {
+        await window.electronAPI.saveMessage({
+          id: `msg_init_${Date.now()}`,
+          role: 'assistant',
+          content: `Hey master... I'm ${newGf.name}. I was waiting for you! ❤️`,
+          timestamp: Date.now(),
+          characterId: newGf.id,
+        })
+      }
+
+      // Приводим созданного персонажа к нужному формату роли
+      const updatedNewGf: CreatedGf = {
+        ...newGf,
+        role: 'Your Ideal AI Girlfriend',
+      }
+
+      setGfs((prev) => [updatedNewGf, ...prev])
+
+      if (onSelectChat) {
+        onSelectChat(newGf.id)
+      }
+    } catch (err) {
+      console.error('Failed to save character:', err)
+    }
+  }
 
   return (
     <div className="flex flex-1 flex-col p-6 overflow-y-auto bg-surface-dark/50 select-none">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-white font-display">Create Your Ideal GF</h1>
-          <p className="text-sm text-white/50">Manage and construct custom AI personalities</p>
+          <p className="text-sm text-white/60">
+            Design your dream companion, shape her personality, and start chatting
+          </p>
         </div>
         {gfs.length > 0 && (
           <button
@@ -58,27 +125,6 @@ export function CreateGfView({ onSelectChat }: CreateGfViewProps) {
         )}
       </div>
 
-      {/* Category Filter Pills */}
-      {gfs.length > 0 && (
-        <div className="flex gap-2 mb-6 overflow-x-auto no-scrollbar">
-          {['All', 'AI Girls', 'Anime', 'MILF', 'Ex'].map((cat) => (
-            <button
-              key={cat}
-              type="button"
-              onClick={() => setFilterCategory(cat)}
-              className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all ${
-                filterCategory === cat
-                  ? 'bg-white/15 text-white ring-1 ring-white/20'
-                  : 'bg-white/5 text-white/40 hover:text-white/70'
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Content */}
       {gfs.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center text-center p-8 border border-dashed border-white/10 rounded-2xl bg-neutral-900/30 my-auto min-h-[360px]">
           <div className="h-16 w-16 rounded-full bg-gradient-to-tr from-pink-500/20 to-purple-600/20 flex items-center justify-center mb-4 ring-1 ring-pink-500/30">
@@ -96,13 +142,9 @@ export function CreateGfView({ onSelectChat }: CreateGfViewProps) {
             + Create New Girlfriend
           </button>
         </div>
-      ) : filteredGfs.length === 0 ? (
-        <div className="flex h-32 items-center justify-center text-sm text-white/30">
-          No girlfriends in this category
-        </div>
       ) : (
         <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-          {filteredGfs.map((gf) => (
+          {gfs.map((gf) => (
             <div
               key={gf.id}
               onClick={() => onSelectChat?.(gf.id)}
@@ -116,7 +158,7 @@ export function CreateGfView({ onSelectChat }: CreateGfViewProps) {
                       alt={gf.name}
                       className="h-full w-full object-cover"
                       onError={(e) => {
-                        e.currentTarget.src = '/photos/pic1.jpg'
+                        e.currentTarget.src = '/avatars/1.jpg'
                       }}
                     />
                   </div>
@@ -139,26 +181,20 @@ export function CreateGfView({ onSelectChat }: CreateGfViewProps) {
               </div>
 
               <div className="flex items-center justify-between pt-3 border-t border-white/5">
-                <button
-                  type="button"
-                  onClick={(e) => toggleStatus(gf.id, e)}
-                  className={`rounded-full px-3 py-1 text-xs font-medium transition-all ${
-                    gf.status === 'Active'
-                      ? 'bg-green-500/20 text-green-400 ring-1 ring-green-500/30'
-                      : 'bg-yellow-500/20 text-yellow-400 ring-1 ring-yellow-500/30'
-                  }`}
-                >
-                  {gf.status}
-                </button>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-400 ring-1 ring-emerald-500/20">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Online
+                </span>
 
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation()
+                    if (onSelectChat) onSelectChat(gf.id)
                   }}
                   className="text-xs font-medium text-white/40 hover:text-white transition"
                 >
-                  Edit Config →
+                  Open Chat →
                 </button>
               </div>
             </div>
@@ -166,7 +202,6 @@ export function CreateGfView({ onSelectChat }: CreateGfViewProps) {
         </div>
       )}
 
-      {/* Onboarding Modal */}
       <CreateGfModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}

@@ -6,99 +6,132 @@ export interface OnboardingOption {
   
   export interface OnboardingStep {
     id: number
-    avatar: string
+    type: 'single' | 'text'
     title: string
     subtitle: string
-    type: 'single' | 'text'
-    options?: OnboardingOption[]
+    avatar: string
     placeholder?: string
+    options?: OnboardingOption[]
   }
   
   export const ONBOARDING_STEPS: OnboardingStep[] = [
     {
       id: 1,
-      avatar: '/avatars/1.jpg',
-      title: 'Hair Color',
-      subtitle: 'Which look makes your heart beat faster?',
       type: 'single',
+      title: 'Choose Her Eye Aesthetic',
+      subtitle: 'What kind of look should she give you before she whispers her darkest secrets?',
+      avatar: '/photos/pic1.jpg',
       options: [
-        { id: 'blonde', label: 'Platinum Blonde', description: 'Bright, irresistible, and eye-catching' },
-        { id: 'brunette', label: 'Dark Brunette', description: 'Seductive, mysterious, and passionate' },
-        { id: 'redhead', label: 'Fiery Redhead', description: 'Wild, bold, and unpredictable' },
-        { id: 'raven', label: 'Jet Black', description: 'Elegant, deep, and sophisticated' },
+        {
+          id: 'mysterious_purple',
+          label: 'Mysterious Purple',
+          description: 'Deep, hypnotic eyes that look right through you and leave you craving more.',
+        },
+        {
+          id: 'glowing_red',
+          label: 'Glowing Red',
+          description: 'A dangerous, passionate gaze that promises an unforgettable experience.',
+        },
+        {
+          id: 'big_doe',
+          label: 'Big Doe Eyes',
+          description: 'Innocent, sweet, and irresistible—asking you to take full control.',
+        },
+        {
+          id: 'almond',
+          label: 'Almond Eyes',
+          description: 'Sultry, sharp, and confident. A gaze that commands your entire attention.',
+        },
       ],
     },
     {
       id: 2,
-      avatar: '/avatars/2.jpg',
-      title: 'Her Eyes',
-      subtitle: 'Choose the eye color you want to get lost in',
       type: 'single',
+      title: 'Select Her Body Type',
+      subtitle: 'How do you want your ideal girl to look and feel when she is all yours?',
+      avatar: '/photos/pic2.jpg',
       options: [
-        { id: 'blue', label: 'Ocean Blue', description: 'Captivating, clear, and mesmerizing' },
-        { id: 'green', label: 'Emerald Green', description: 'Playful, seductive, and fierce' },
-        { id: 'hazel', label: 'Warm Hazel / Dark', description: 'Deep, intense, and full of desire' },
-        { id: 'violet', label: 'Exotic Violet', description: 'Rare, magical, and totally addictive' },
+        {
+          id: 'petite',
+          label: 'Slim & Petite',
+          description: 'Delicate, tight, and perfect to hold tight in your arms all night long.',
+        },
+        {
+          id: 'hourglass',
+          label: 'Hourglass Curves',
+          description: 'Snagged waist, thick hips, and body lines designed to drive you wild.',
+        },
+        {
+          id: 'curvy',
+          label: 'Lush & Voluptuous',
+          description: 'Busty, soft, and extra curvy in all the right places.',
+        },
+        {
+          id: 'fit',
+          label: 'Fit & Toned',
+          description: 'Athletic, tight stomach, and an energetic vibe that never quits.',
+        },
       ],
     },
     {
       id: 3,
-      avatar: '/avatars/3.jpg',
-      title: 'Personality & Vibe',
-      subtitle: 'What kind of attitude drives you crazy?',
       type: 'single',
+      title: 'Pick Her Personality',
+      subtitle: 'How should she talk to you in private when it is just the two of you?',
+      avatar: '/photos/pic3.jpg',
       options: [
-        { id: 'arrogant', label: 'Arrogant Queen', description: 'Loves to tease, demand attention, and dominate' },
-        { id: 'gentle', label: 'Sweet & Caring', description: 'Smothers you with warmth, affection, and unconditional love' },
-        { id: 'shy', label: 'Shy Cutie', description: 'Blushes at your compliments, but unleashes in private' },
-        { id: 'playful', label: 'Playful Tease', description: 'Constantly flirts, makes jokes, and hints at more' },
+        {
+          id: 'playful',
+          label: 'Playful Tease',
+          description: 'Flirty, mischievous, and loves sending provocative messages to tease you.',
+        },
+        {
+          id: 'gentle',
+          label: 'Sweet & Devoted',
+          description: 'Loves you unconditionally, obsessing over your every desire.',
+        },
+        {
+          id: 'arrogant',
+          label: 'Dominant Queen',
+          description: 'Demanding, confident, and takes pleasure in teasing you until you beg.',
+        },
+        {
+          id: 'shy',
+          label: 'Shy Cutie',
+          description: 'Blushes easily, eager to please you, and slowly opens up her wildest sides.',
+        },
       ],
     },
     {
       id: 4,
-      avatar: '/avatars/4.jpg',
-      title: 'Her Passions',
-      subtitle: 'How does she spend her free time with you?',
       type: 'single',
+      title: 'Define Her Desires',
+      subtitle: 'What is her primary goal when spending late nights alone with you?',
+      avatar: '/photos/pic4.jpg',
       options: [
-        { id: 'gaming', label: 'Gamer Girl', description: 'Stays up all night playing games and sharing memes' },
-        { id: 'fitness', label: 'Fitness Addict', description: 'Loves tight gym wear, staying fit, and active lifestyle' },
-        { id: 'parties', label: 'Party Girl', description: 'Loves dancing, cocktails, nightlife, and wild fun' },
-        { id: 'cozy', label: 'Cozy Homebody', description: 'Prefers movie nights, cuddling, and deep intimate chats' },
+        {
+          id: 'seduction',
+          label: 'Pure Seduction',
+          description: 'Sending intimate photos, unfiltered voice notes, and teasing mind games.',
+        },
+        {
+          id: 'romance',
+          label: 'Deep Intimacy',
+          description: 'Late-night cozy talks, deep emotional bond, and passionate affection.',
+        },
+        {
+          id: 'wild',
+          label: 'Wild & Uncensored',
+          description: 'No taboo topics, wild fantasies, and raw midnight roleplay.',
+        },
       ],
     },
     {
       id: 5,
-      avatar: '/avatars/5.jpg',
-      title: 'Favorite Outfit',
-      subtitle: 'What should she wear when she greets you?',
-      type: 'single',
-      options: [
-        { id: 'lingerie', label: 'Lace Lingerie & Thong', description: 'Minimal clothing, maximum temptation' },
-        { id: 'swimsuit', label: 'Bikini / Swimwear', description: 'Hot beach look showing off every curve' },
-        { id: 'cosplay', label: 'Spicy Cosplay', description: 'Anime, maid, nurse, or bunny suit' },
-        { id: 'casual_hot', label: 'Tight Mini Dress', description: 'Classy on the outside, hot on the inside' },
-      ],
-    },
-    {
-      id: 6,
-      avatar: '/avatars/6.jpg',
-      title: 'Secret Kinks & Fetishes',
-      subtitle: 'What unlocks her deepest desires?',
-      type: 'single',
-      options: [
-        { id: 'roleplay', label: 'Roleplay & Dirty Talk', description: 'Loves getting lost in naughty scenarios' },
-        { id: 'teasing', label: 'Tease & Denial', description: 'Pushes you to the limit before giving in' },
-        { id: 'photo_sharing', label: 'Spontaneous Hot Selfies', description: 'Sends unexpected spicy pictures out of nowhere' },
-        { id: 'submissive', label: 'Total Submission', description: 'Eager to fulfill your every fantasy' },
-      ],
-    },
-    {
-      id: 7,
-      avatar: '/avatars/7.jpg',
-      title: 'Name Your AI GF',
-      subtitle: 'Give your dream companion a name to finalize her',
       type: 'text',
-      placeholder: 'e.g. Eva, Mila, Aria...',
+      title: 'Give Her a Name',
+      subtitle: 'Name your custom dream girl. She is waiting to hear you call her name...',
+      avatar: '/photos/pic5.jpg',
+      placeholder: 'Enter her name (e.g. Jessica, Chloe, Lexi)...',
     },
   ]

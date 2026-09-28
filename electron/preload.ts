@@ -46,6 +46,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getCharacters: (): Promise<CharacterRecordLocal[]> =>
     ipcRenderer.invoke('db:get-characters'),
 
+  addCharacter: (char: CharacterRecordLocal): Promise<void> =>
+    ipcRenderer.invoke('db:add-character', char),
+
   getMessagesByCharacter: (characterId: string): Promise<MessageRecordLocal[]> =>
     ipcRenderer.invoke('db:get-messages-by-character', characterId),
 

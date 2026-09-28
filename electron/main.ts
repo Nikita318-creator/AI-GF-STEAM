@@ -7,7 +7,7 @@ import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'fs'
 import { exec } from 'child_process'
 import { fetchAIResponse } from './aiServiceCore.js'
 import type { FetchAIParams } from './types.js'
-import { dbService, type MessageRecord } from './db.js'
+import { dbService, type MessageRecord, type CharacterRecord } from './db.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const isDev = !app.isPackaged
@@ -36,15 +36,20 @@ function selectVideoUrl(avatar?: string): string {
   const fileName = avatar?.split('/').pop()?.toLowerCase() || ''
   let category: 'blond' | 'brunet' | 'anime' | 'all' = 'all'
 
-  // Список аватарок для аниме: 11.jpg, 12.jpg, ..., 20.jpg
-  const animeAvatars = Array.from({ length: 10 }, (_, i) => `${i + 11}.jpg`)
+  // Проверяем, содержит ли имя файла "mygf"
+  const isMyGF = fileName.includes('mygf')
 
-  if (['1.jpg', '2.jpg', '4.jpg', '7.jpg', '10.jpg'].includes(fileName)) {
-    category = 'blond'
-  } else if (['3.jpg', '5.jpg', '6.jpg', '8.jpg', '9.jpg'].includes(fileName)) {
-    category = 'brunet'
-  } else if (animeAvatars.includes(fileName)) {
-    category = 'anime'
+  if (!isMyGF) {
+    // Список аватарок для аниме: 11.jpg, 12.jpg, ..., 20.jpg
+    const animeAvatars = Array.from({ length: 10 }, (_, i) => `${i + 11}.jpg`)
+
+    if (['1.jpg', '2.jpg', '4.jpg', '7.jpg', '10.jpg'].includes(fileName)) {
+      category = 'blond'
+    } else if (['3.jpg', '5.jpg', '6.jpg', '8.jpg', '9.jpg'].includes(fileName)) {
+      category = 'brunet'
+    } else if (animeAvatars.includes(fileName)) {
+      category = 'anime'
+    }
   }
 
   const pool = category === 'blond' 
@@ -53,7 +58,7 @@ function selectVideoUrl(avatar?: string): string {
     ? allLinksBrunet 
     : category === 'anime' 
     ? allLinksAnime 
-    : allLinks
+    : allLinks // Сюда попадают все myGF и нераспознанные аватарки
 
   return pool[Math.floor(Math.random() * pool.length)]
 }
@@ -197,6 +202,15 @@ ipcMain.handle('db:get-last-message', (_, characterId: string) => {
   } catch (err) {
     console.error('[SQLite ERROR] Failed to get last message:', err)
     return null
+  }
+})
+
+ipcMain.handle('db:add-character', (_, character: CharacterRecord) => {
+
+  try {
+    dbService.addCharacter(character)
+  } catch (err) {
+    console.error('[SQLite ERROR] Failed to add character:', err)
   }
 })
 

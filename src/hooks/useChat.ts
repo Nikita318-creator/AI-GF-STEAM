@@ -55,21 +55,36 @@ function getRandomPhotoForCharacter(avatarPath?: string): string {
       return `/photos/ex${randomNum}.jpg`
     }
     case 'gf':
-    default: {
-      const blondeAvatars = [1, 2, 4, 7, 10]
-      const brunetteAvatars = [3, 5, 6, 8, 9]
-
-      if (blondeAvatars.includes(avatarNum)) {
-        const randomNum = Math.floor(Math.random() * 124) + 1
-        return `/photos/pic${randomNum}.jpg`
-      } else if (brunetteAvatars.includes(avatarNum)) {
-        const randomNum = Math.floor(Math.random() * 115) + 1
-        return `/photos/photo${randomNum}.jpg`
-      } else {
-        const randomNum = Math.floor(Math.random() * 124) + 1
-        return `/photos/pic${randomNum}.jpg`
+      default: {
+        const blondeAvatars = [1, 2, 4, 7, 10]
+        const brunetteAvatars = [3, 5, 6, 8, 9]
+  
+        if (blondeAvatars.includes(avatarNum)) {
+          const randomNum = Math.floor(Math.random() * 124) + 1
+          return `/photos/pic${randomNum}.jpg`
+        } else if (brunetteAvatars.includes(avatarNum)) {
+          const randomNum = Math.floor(Math.random() * 115) + 1
+          return `/photos/photo${randomNum}.jpg`
+        } else {
+          // Проверяем, содержат ли avatarPath или avatarNum префикс myGF
+          const match = avatarPath?.match(/myGF(\d+)/i)
+  
+          if (match) {
+            const num = parseInt(match[1], 10)
+  
+            // Распределяем по парам: 1-2 -> 1, 3-4 -> 2, 5-6 -> 3, 7-8 -> 4
+            if (num >= 1 && num <= 8) {
+              const groupNum = Math.ceil(num / 2)
+              const randomPhotoNum = Math.floor(Math.random() * 15) + 1
+              return `/photos/MyGF_${groupNum}_${randomPhotoNum}.jpg`
+            }
+          }
+  
+          // Дефолтный фоллбек, если под myGFX не подошло
+          const randomNum = Math.floor(Math.random() * 124) + 1
+          return `/photos/pic${randomNum}.jpg`
+        }
       }
-    }
   }
 }
 
