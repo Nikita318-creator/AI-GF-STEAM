@@ -10,6 +10,13 @@ import {
 } from 'lucide-react'
 import { extractVideoId, feedPool } from './feedVM'
 
+declare global {
+  interface Window {
+    YT: any
+    onYouTubeIframeAPIReady: (() => void) | undefined
+  }
+}
+
 export interface ReelItem {
   id: string
   url: string
@@ -22,20 +29,65 @@ interface ReelsViewProps {
   reels?: ReelItem[]
 }
 
+const REALISTIC_NICKNAMES = [
+  'vibe_check',
+  'soft.girl.era',
+  'no_context_m',
+  'draining.core',
+  'night.drive.vibes',
+  'main.character. energy',
+  'sad_boy_club',
+  'latenight.thoughts',
+  'cozy_corner',
+  'daily.dose.of.chill',
+  'aesthetic_junkie',
+  'lost_in_tokyo',
+  'retro_futurism',
+  'urban_explorer',
+  'coffee_and_code',
+  'mindful.moments',
+  'afterhours.session',
+  'velvet.sky',
+  'broken.record',
+  'silent_vogue',
+  'digital.archive',
+  'lofi_moods',
+  'chasing_sunsets',
+  'neon_reflections',
+  'raw_captures',
+  'pure.nostalgia',
+  'street_canvas',
+  'subtle.flex',
+  'endless_scroll',
+  'parallel.universe',
+]
+
+function getRandomNickname(): string {
+  return REALISTIC_NICKNAMES[Math.floor(Math.random() * REALISTIC_NICKNAMES.length)]
+}
+
 function getRandomReel(pool: ReelItem[] | string[], indexOffset: number): ReelItem {
+  const randomNick = getRandomNickname()
+
   if (pool.length === 0) {
     return {
       id: `random-${Date.now()}-${indexOffset}`,
       url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-      authorName: 'Girlfriend',
-      authorAvatar: '/photos/pic1.jpg',
-      likesCount: 150,
+      authorName: randomNick,
+      authorAvatar: `/photos/pic${(indexOffset % 10) + 1}.jpg`,
+      likesCount: Math.floor(Math.random() * 800) + 100,
     }
   }
 
   const raw = pool[Math.floor(Math.random() * pool.length)]
   const url = typeof raw === 'string' ? raw : raw.url
-  const authorName = typeof raw === 'string' ? `Girlfriend #${(indexOffset % 5) + 1}` : raw.authorName
+  
+  // Жестко перезаписываем любые старые моки Girlfriend/friend
+  let authorName = typeof raw === 'string' ? randomNick : raw.authorName
+  if (!authorName || authorName.toLowerCase().includes('friend')) {
+    authorName = randomNick
+  }
+
   const authorAvatar = typeof raw === 'string' ? `/photos/pic${(indexOffset % 10) + 1}.jpg` : raw.authorAvatar
 
   return {
@@ -53,11 +105,28 @@ export const ReelsView: React.FC<ReelsViewProps> = ({ reels: initialReels = [] }
   const [likedMap, setLikedMap] = useState<Record<string, boolean>>({})
   const [likesCountMap, setLikesCountMap] = useState<Record<string, number>>({})
   
-  // Глобальный звук для всех видео
   const [isMuted, setIsMuted] = useState(true)
+  const [isApiReady, setIsApiReady] = useState(false)
 
   const containerRef = useRef<HTMLDivElement>(null)
   const sourcePoolRef = useRef<ReelItem[] | string[]>(feedPool)
+
+  useEffect(() => {
+    if (window.YT && window.YT.Player) {
+      setIsApiReady(true)
+      return
+    }
+
+    const tag = document.createElement('script')
+    tag.src = 'https://www.youtube.com/iframe_api'
+    const firstScriptTag = document.getElementsByTagName('script')[0]
+    firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag)
+
+    window.onYouTubeIframeAPIReady = () => {
+      console.log('🚀 [YT API] YouTube IFrame API Ready')
+      setIsApiReady(true)
+    }
+  }, [])
 
   useEffect(() => {
     const pool = initialReels.length > 0 ? initialReels : feedPool
@@ -102,8 +171,8 @@ export const ReelsView: React.FC<ReelsViewProps> = ({ reels: initialReels = [] }
   }
 
   const handleVideoError = useCallback(
-    (failedIndex: number) => {
-      console.warn(`[ReelsView] Video at index ${failedIndex} failed or restricted. Skipping to next.`)
+    (failedIndex: number, reason: string) => {
+      console.warn(`🚨 [ReelsView] Auto-skipping video at index [${failedIndex}]. Reason: ${reason}`)
       appendMoreItems()
 
       if (containerRef.current) {
@@ -161,12 +230,13 @@ export const ReelsView: React.FC<ReelsViewProps> = ({ reels: initialReels = [] }
           reel={reel}
           isFirst={index === 0}
           isActive={index === activeIndex}
+          isApiReady={isApiReady}
           isMuted={isMuted}
           onToggleMute={handleToggleMuteGlobal}
           isLiked={!!likedMap[reel.id]}
           likesCount={likesCountMap[reel.id] ?? reel.likesCount ?? 0}
           onToggleLike={() => toggleLike(reel)}
-          onError={() => handleVideoError(index)}
+          onError={(reason) => handleVideoError(index, reason)}
         />
       ))}
     </div>
@@ -178,12 +248,13 @@ interface ReelCardProps {
   reel: ReelItem
   isFirst: boolean
   isActive: boolean
+  isApiReady: boolean
   isMuted: boolean
   onToggleMute: () => void
   isLiked: boolean
   likesCount: number
   onToggleLike: () => void
-  onError: () => void
+  onError: (reason: string) => void
 }
 
 const ReelCard: React.FC<ReelCardProps> = memo(({
@@ -191,6 +262,7 @@ const ReelCard: React.FC<ReelCardProps> = memo(({
   reel,
   isFirst,
   isActive,
+  isApiReady,
   isMuted,
   onToggleMute,
   isLiked,
@@ -204,32 +276,96 @@ const ReelCard: React.FC<ReelCardProps> = memo(({
   const [showScrollHint, setShowScrollHint] = useState(true)
   const [isPlaying, setIsPlaying] = useState(true)
   
-  const iframeRef = useRef<HTMLIFrameElement>(null)
-
-  const sendIframeCommand = useCallback((func: string, args: any[] = []) => {
-    if (iframeRef.current && iframeRef.current.contentWindow) {
-      iframeRef.current.contentWindow.postMessage(
-        JSON.stringify({ event: 'command', func, args }),
-        '*'
-      )
-    }
-  }, [])
+  const playerContainerRef = useRef<HTMLDivElement>(null)
+  const playerRef = useRef<any>(null)
+  const isMutedRef = useRef(isMuted)
 
   useEffect(() => {
-    if (isActive && isIframeLoaded) {
-      sendIframeCommand(isMuted ? 'mute' : 'unMute')
+    isMutedRef.current = isMuted
+  }, [isMuted])
+
+  useEffect(() => {
+    if (!isActive || !isApiReady || !videoId || !playerContainerRef.current) {
+      if (playerRef.current) {
+        try {
+          playerRef.current.destroy()
+        } catch {}
+        playerRef.current = null
+      }
+      setIsIframeLoaded(false)
+      return
     }
-  }, [isActive, isIframeLoaded, isMuted, sendIframeCommand])
+
+    playerRef.current = new window.YT.Player(playerContainerRef.current, {
+      videoId: videoId,
+      playerVars: {
+        autoplay: 1,
+        mute: isMutedRef.current ? 1 : 0,
+        controls: 0,
+        loop: 1,
+        playlist: videoId,
+        playsinline: 1,
+        modestbranding: 1,
+        rel: 0,
+        origin: window.location.origin,
+      },
+      events: {
+        onReady: (event: any) => {
+          setIsIframeLoaded(true)
+          if (isMutedRef.current) {
+            event.target.mute()
+          } else {
+            event.target.unMute()
+          }
+          event.target.playVideo()
+        },
+        onStateChange: (event: any) => {
+          if (event.data === window.YT.PlayerState.PLAYING) {
+            setIsPlaying(true)
+          } else if (event.data === window.YT.PlayerState.PAUSED) {
+            setIsPlaying(false)
+          }
+        },
+        onError: (event: any) => {
+          onError(`YouTube API Error Code: ${event.data}`)
+        },
+      },
+    })
+
+    return () => {
+      if (playerRef.current) {
+        try {
+          playerRef.current.destroy()
+        } catch {}
+        playerRef.current = null
+      }
+    }
+  }, [isActive, isApiReady, videoId])
 
   const handleTogglePlay = () => {
+    if (!playerRef.current) return
     const nextPlaying = !isPlaying
     setIsPlaying(nextPlaying)
-    sendIframeCommand(nextPlaying ? 'playVideo' : 'pauseVideo')
+
+    if (nextPlaying) {
+      playerRef.current.playVideo()
+    } else {
+      playerRef.current.pauseVideo()
+    }
   }
 
   const handleToggleMuteClick = (e: React.MouseEvent) => {
     e.stopPropagation()
+    const nextMuted = !isMuted
     onToggleMute()
+
+    if (playerRef.current) {
+      if (nextMuted) {
+        playerRef.current.mute()
+      } else {
+        playerRef.current.unMute()
+      }
+    }
   }
 
   const handleToggleLikeClick = (e: React.MouseEvent) => {
@@ -239,43 +375,32 @@ const ReelCard: React.FC<ReelCardProps> = memo(({
 
   useEffect(() => {
     if (isFirst && isActive) {
-      const timer = setTimeout(() => {
-        setShowScrollHint(false)
-      }, 5000)
-
+      const timer = setTimeout(() => setShowScrollHint(false), 5000)
       return () => clearTimeout(timer)
     }
   }, [isFirst, isActive])
 
   useEffect(() => {
     if (!videoId) return
-
     const maxRes = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
     const fallback = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
 
     const img = new Image()
     img.src = maxRes
     img.onload = () => {
-      if (img.width === 120) {
-        setPreviewUrl(fallback)
-      } else {
-        setPreviewUrl(maxRes)
-      }
+      if (img.width === 120) setPreviewUrl(fallback)
+      else setPreviewUrl(maxRes)
     }
-    img.onerror = () => {
-      setPreviewUrl(fallback)
-    }
+    img.onerror = () => setPreviewUrl(fallback)
   }, [videoId])
 
   useEffect(() => {
     if (!videoId && isActive) {
-      onError()
+      onError('Invalid or Missing Video ID')
     }
   }, [videoId, isActive, onError])
 
   if (!videoId) return null
-
-  const embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${videoId}&playsinline=1&modestbranding=1&rel=0&enablejsapi=1`
 
   return (
     <div className="relative h-full w-full snap-start snap-always overflow-hidden bg-black flex items-center justify-center">
@@ -298,15 +423,9 @@ const ReelCard: React.FC<ReelCardProps> = memo(({
         )}
 
         {isActive && (
-          <iframe
-            ref={iframeRef}
-            src={embedUrl}
-            title="YouTube Video"
-            allow="autoplay; encrypted-media; picture-in-picture"
-            className="absolute w-full h-full object-cover scale-[1.21] border-0 pointer-events-none z-5"
-            onLoad={() => setIsIframeLoaded(true)}
-            onError={onError}
-          />
+          <div className="absolute inset-0 w-full h-full scale-[1.21] pointer-events-none z-5">
+            <div ref={playerContainerRef} className="w-full h-full" />
+          </div>
         )}
 
         {/* Прозрачное одеяло для Play/Pause */}
@@ -319,35 +438,37 @@ const ReelCard: React.FC<ReelCardProps> = memo(({
           </div>
         )}
 
-        {/* Кнопка звука */}
-        <button
-          onClick={handleToggleMuteClick}
-          className="absolute top-6 right-6 z-20 rounded-full bg-black/40 p-3 text-white backdrop-blur-md hover:bg-black/60 transition-colors active:scale-95"
-        >
-          {isMuted ? <VolumeXIcon className="h-6 w-6" /> : <Volume2Icon className="h-6 w-6" />}
-        </button>
-
-        {/* Инфо об авторе */}
-        <div className="absolute bottom-6 left-4 right-16 z-20 flex items-center gap-3 pointer-events-none">
+        {/* Аватарка прижата К СТЕНКАМ (верх-лево), ник ПОД НЕЙ */}
+        <div className="absolute top-0 left-0 z-20 flex flex-col items-start pointer-events-none">
           {reel.authorAvatar ? (
             <img
               src={reel.authorAvatar}
               alt={reel.authorName}
-              className="h-10 w-10 rounded-full border-2 border-white/20 object-cover shadow-lg"
+              className="h-14 w-14 rounded-br-2xl object-cover shadow-2xl border-r border-b border-white/20"
             />
           ) : (
-            <div className="h-10 w-10 rounded-full border-2 border-white/20 bg-gray-800 flex items-center justify-center text-white shadow-lg">
-              <UserIcon className="h-5 w-5" />
+            <div className="h-14 w-14 rounded-br-2xl bg-gray-900/90 backdrop-blur-md flex items-center justify-center text-white shadow-2xl border-r border-b border-white/20">
+              <UserIcon className="h-6 w-6" />
             </div>
           )}
-          <span className="font-semibold text-white drop-shadow-md text-sm">{reel.authorName}</span>
+          <span className="mt-1.5 ml-2 font-medium text-white drop-shadow-lg text-[11px] tracking-wide bg-black/50 backdrop-blur-md px-2 py-0.5 rounded-md border border-white/10">
+            @{reel.authorName}
+          </span>
         </div>
 
-        {/* Кнопка Лайка */}
+        {/* Кнопка звука — ПРАВЫЙ ВЕРХНИЙ УГОЛ */}
+        <button
+          onClick={handleToggleMuteClick}
+          className="absolute top-4 right-4 z-20 rounded-full bg-black/40 p-3 text-white backdrop-blur-md hover:bg-black/60 transition-colors active:scale-95 border border-white/10"
+        >
+          {isMuted ? <VolumeXIcon className="h-5 w-5" /> : <Volume2Icon className="h-5 w-5" />}
+        </button>
+
+        {/* Кнопка Лайка — ВНИЗУ СПРАВА */}
         <div className="absolute bottom-6 right-4 z-20 flex flex-col items-center gap-1">
           <button
             onClick={handleToggleLikeClick}
-            className="flex h-12 w-12 items-center justify-center rounded-full bg-black/40 backdrop-blur-md active:scale-90 transition-transform hover:bg-black/60"
+            className="flex h-12 w-12 items-center justify-center rounded-full bg-black/40 backdrop-blur-md active:scale-90 transition-transform hover:bg-black/60 border border-white/10"
           >
             <HeartIcon className={`h-6 w-6 ${isLiked ? 'fill-red-500 text-red-500' : 'text-white'}`} />
           </button>
@@ -355,7 +476,7 @@ const ReelCard: React.FC<ReelCardProps> = memo(({
         </div>
 
         {isFirst && isActive && showScrollHint && (
-          <div className="absolute top-16 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center gap-1 bg-black/60 px-4 py-2 rounded-full backdrop-blur-md animate-bounce pointer-events-none transition-opacity duration-500">
+          <div className="absolute top-20 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center gap-1 bg-black/60 px-4 py-2 rounded-full backdrop-blur-md animate-bounce pointer-events-none transition-opacity duration-500 border border-white/10">
             <span className="text-xs text-white/90 font-medium">Scroll down for next video</span>
             <ChevronDownIcon className="h-4 w-4 text-white/90" />
           </div>
