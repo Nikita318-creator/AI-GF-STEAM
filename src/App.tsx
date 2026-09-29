@@ -24,7 +24,7 @@ export function App() {
   const activeCharRecord = characters.find((c) => c.id === selectedCharId)
 
   // 1. Достали sendImageMessage из хука
-  const { messages, isTyping, isReady, isAudioMode, sendMessage, sendImageMessage } = useChat(
+  const { messages, isTyping, isReady, isAudioMode, sendMessage, sendImageMessage, deleteMessage } = useChat(
     selectedCharId,
     activeCharRecord?.avatar
   )
@@ -97,6 +97,7 @@ export function App() {
                 characterAvatar={activeCharacter?.avatar || ''}
                 isTyping={isTyping}
                 onSendGift={sendImageMessage}
+                onDeleteMessage={deleteMessage}
                 onBack={() => {
                   ttsService.stop()
                   setSelectedCharId(null)

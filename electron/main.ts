@@ -214,6 +214,14 @@ ipcMain.handle('db:add-character', (_, character: CharacterRecord) => {
   }
 })
 
+ipcMain.handle('db:delete-message', (_, id: string) => {
+  try {
+    dbService.deleteMessage(id)
+  } catch (err) {
+    console.error('[SQLite ERROR] Failed to delete message:', err)
+  }
+})
+
 app.whenReady().then(() => {
   // Разрешаем iframe YouTube корректно обращаться к видео без блокировки 152
   session.defaultSession.webRequest.onBeforeSendHeaders(

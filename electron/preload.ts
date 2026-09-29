@@ -25,6 +25,9 @@ const { contextBridge, ipcRenderer } = require('electron')
 contextBridge.exposeInMainWorld('electronAPI', {
   platform: process.platform,
 
+  deleteMessage: (id: string): Promise<void> =>
+    ipcRenderer.invoke('db:delete-message', id),
+  
   getLocale: (): Promise<string> =>
     ipcRenderer.invoke('system:get-locale'),
 

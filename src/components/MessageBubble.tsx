@@ -7,12 +7,19 @@ interface MessageBubbleProps {
   message: Message
   characterName: string
   characterAvatar: string
+  onDelete?: (messageId: string) => void
+}
+
+interface ContextMenuPosition {
+  x: number
+  y: number
 }
 
 export function MessageBubble({
   message,
   characterName,
   characterAvatar,
+  onDelete,
 }: MessageBubbleProps) {
   const isUser = message.role === 'user'
   const [isPhotoOpen, setIsPhotoOpen] = useState(false)
@@ -21,7 +28,10 @@ export function MessageBubble({
   const [isLoading, setIsLoading] = useState(false)
   const [localAudioUrl, setLocalAudioUrl] = useState<string | undefined>(message.audioUrl)
 
-  // Синхронизируем локальный URL, если он прилетел из пропсов (свежесозданное сообщение)
+  // Стейт позиционирования контекстного меню
+  const [contextMenu, setContextMenu] = useState<ContextMenuPosition | null>(null)
+
+  // Синхронизируем локальный URL
   useEffect(() => {
     if (message.audioUrl) {
       setLocalAudioUrl(message.audioUrl)
@@ -40,19 +50,57 @@ export function MessageBubble({
     }
   }, [message.id])
 
+  // Закрытие контекстного меню при любом внешнем клике или скролле
+  useEffect(() => {
+    const handleCloseMenu = () => setContextMenu(null)
+    if (contextMenu) {
+      window.addEventListener('click', handleCloseMenu)
+      window.addEventListener('scroll', handleCloseMenu, true)
+    }
+    return () => {
+      window.removeEventListener('click', handleCloseMenu)
+      window.removeEventListener('scroll', handleCloseMenu, true)
+    }
+  }, [contextMenu])
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+    })
+  }
+
+  const handleCopy = async () => {
+    const textToCopy = message.content || message.imageUrl || message.videoUrl || ''
+    if (textToCopy) {
+      try {
+        await navigator.clipboard.writeText(textToCopy)
+      } catch (err) {
+        console.error('Failed to copy text:', err)
+      }
+    }
+    setContextMenu(null)
+  }
+
+  const handleDelete = () => {
+    setContextMenu(null)
+    if (onDelete) {
+      onDelete(message.id)
+    }
+  }
+
   const handleAudioClick = async () => {
-    // Если уже играет или на паузе — просто переключаем
     if (localAudioUrl) {
       ttsService.togglePlay(message.id, localAudioUrl)
       return
     }
 
-    // Если аудио нет (например, перезагрузили прилу) — генерируем на лету по тексту
     if (!message.content) return
 
     try {
       setIsLoading(true)
-      // Определяем язык (если текст на кириллице — русский, иначе английский)
       const isRussian = /[а-яё]/i.test(message.content)
       const lang = isRussian ? 'ru-RU' : 'en-US'
 
@@ -92,7 +140,8 @@ export function MessageBubble({
           )}
 
           <div
-            className={`relative rounded-2xl p-2 text-[15px] leading-relaxed ${
+            onContextMenu={handleContextMenu}
+            className={`relative rounded-2xl p-2 text-[15px] leading-relaxed select-text cursor-default ${
               isUser
                 ? 'rounded-br-md bg-gradient-to-br from-bubble-user to-purple-700 text-white shadow-lg shadow-purple-900/30 px-4 py-3'
                 : 'rounded-bl-md bg-bubble-ai text-white/90 ring-1 ring-white/[0.06]'
@@ -134,7 +183,7 @@ export function MessageBubble({
               </div>
             )}
 
-            {/* Аудио Ячейка (Voice Message Player) */}
+            {/* Аудио Ячейка */}
             {message.isAudio ? (
               <div className="px-3 py-2 min-w-[220px]">
                 <div className="flex items-center gap-3">
@@ -158,7 +207,6 @@ export function MessageBubble({
                   </button>
 
                   <div className="flex flex-1 flex-col gap-1">
-                    {/* Визуализатор звуковой волны */}
                     <div className="flex h-6 items-center gap-1">
                       {[35, 65, 40, 85, 95, 45, 75, 55, 30, 70, 90, 60, 40, 80, 50, 30].map((height, i) => (
                         <span
@@ -181,7 +229,6 @@ export function MessageBubble({
                   </div>
                 </div>
 
-                {/* Субтитры под аудио-сообщением */}
                 {message.content.length > 0 && (
                   <p className="mt-2 text-xs text-white/70 border-t border-white/5 pt-2 whitespace-pre-wrap break-words">
                     {message.content}
@@ -189,7 +236,6 @@ export function MessageBubble({
                 )}
               </div>
             ) : (
-              /* Обычное текстовое сообщение */
               message.content.length > 0 && (
                 <p className="whitespace-pre-wrap break-words px-2 py-1">{message.content}</p>
               )
@@ -201,6 +247,37 @@ export function MessageBubble({
           </time>
         </div>
       </div>
+
+      {/* Выпадающее Контекстное Меню (в стиле iOS Context Menu) */}
+      {contextMenu && (
+        <div
+          style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }}
+          className="fixed z-50 min-w-[160px] overflow-hidden rounded-xl bg-[#1c1c1e]/90 p-1 text-sm font-medium text-white shadow-2xl backdrop-blur-xl ring-1 ring-white/10 animate-fade-in"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={handleCopy}
+            className="flex w-full items-center justify-between px-3 py-2 text-left rounded-lg hover:bg-white/10 active:bg-white/20 transition-colors"
+          >
+            <span>Copy</span>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+          </button>
+          
+          <div className="my-1 h-[1px] bg-white/10" />
+
+          <button
+            onClick={handleDelete}
+            className="flex w-full items-center justify-between px-3 py-2 text-left text-red-400 rounded-lg hover:bg-red-500/10 active:bg-red-500/20 transition-colors"
+          >
+            <span>Delete</span>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
+        </div>
+      )}
 
       {/* Полноэкранные модалки */}
       {isPhotoOpen && (

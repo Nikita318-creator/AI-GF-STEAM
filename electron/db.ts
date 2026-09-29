@@ -133,6 +133,11 @@ export const dbService = {
     )
   },
 
+  deleteMessage(id: string): void {
+    const stmt = db.prepare('DELETE FROM messages WHERE id = ?')
+    stmt.run(id)
+  },
+  
   clearHistory(): void {
     const stmt = db.prepare('DELETE FROM messages')
     stmt.run()

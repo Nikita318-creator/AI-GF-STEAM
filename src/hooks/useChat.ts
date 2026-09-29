@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Message } from '@/types/chat'
 import { aiService } from '@/services/ai/aiService'
 import { AIError } from '@/services/ai/types'
-import { configService } from '@/services/config/configService'
 import { ttsService } from '@/services/ttsService'
 import {
   GENERIC_ERROR_TEXT,
@@ -245,7 +244,6 @@ export function useChat(activeCharacterId: string | null, characterAvatar?: stri
       } catch (err) {
         console.error('Failed to load history for character:', err)
       } finally {
-        await configService.init()
         setIsReady(true)
       }
     }
@@ -486,12 +484,34 @@ export function useChat(activeCharacterId: string | null, characterAvatar?: stri
     [activeCharacterId, characterAvatar]
   )
 
-  return {
-    messages,
-    isTyping,
-    isReady,
-    isAudioMode,
-    sendMessage,
-    sendImageMessage,
-  }
+
+const deleteMessage = useCallback(
+  async (messageId: string) => {
+    if (!activeCharacterId) return
+
+    // 1. Оптимистично удаляем из UI стейта
+    setMessages((prev) => prev.filter((m) => m.id !== messageId))
+
+    // 2. Удаляем из SQLite через IPC
+    try {
+      const api = typeof window !== 'undefined' ? (window.electronAPI as any) : undefined
+      if (api && typeof api.deleteMessage === 'function') {
+        await api.deleteMessage(messageId)
+      }
+    } catch (err) {
+      console.error('Failed to delete message from SQLite:', err)
+    }
+  },
+  [activeCharacterId]
+)
+
+return {
+  messages,
+  isTyping,
+  isReady,
+  isAudioMode,
+  sendMessage,
+  sendImageMessage,
+  deleteMessage, // <--- Добавлено
+}
 }

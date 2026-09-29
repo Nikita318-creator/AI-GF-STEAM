@@ -12,6 +12,7 @@ interface ChatWindowProps {
   isTyping: boolean
   onBack: () => void
   onSendGift?: (giftUrl: string) => void
+  onDeleteMessage?: (id: string) => void
 }
 
 export function ChatWindow({
@@ -21,6 +22,7 @@ export function ChatWindow({
   isTyping,
   onBack,
   onSendGift,
+  onDeleteMessage,
 }: ChatWindowProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false)
@@ -120,6 +122,7 @@ export function ChatWindow({
               message={msg}
               characterName={characterName}
               characterAvatar={characterAvatar}
+              onDelete={onDeleteMessage}
             />
           ))}
 
