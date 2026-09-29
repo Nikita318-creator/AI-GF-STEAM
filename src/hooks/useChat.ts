@@ -8,6 +8,9 @@ import {
   GENERIC_ERROR_TEXT,
   RATE_LIMIT_ERROR_TEXT,
   getSystemPrompt,
+  getSystemPromptForAnime,
+  getSystemPromptForMilf,
+  getSystemPromptForEx,
 } from '@/constants/prompts'
 
 export type CharacterCategory = 'gf' | 'anime' | 'milf' | 'ex'
@@ -94,25 +97,25 @@ async function getVideoForCharacter(avatarPath?: string): Promise<string | undef
     if (fetchedUrl) return fetchedUrl
   }
 
-  switch (category) {
-    case 'anime': {
-      const randomNum = Math.floor(Math.random() * 10) + 1
-      return `/videos/anime/video${randomNum}.mp4`
-    }
-    case 'milf': {
-      const randomNum = Math.floor(Math.random() * 10) + 1
-      return `/videos/milf/video${randomNum}.mp4`
-    }
-    case 'ex': {
-      const randomNum = Math.floor(Math.random() * 10) + 1
-      return `/videos/ex/video${randomNum}.mp4`
-    }
-    case 'gf':
-    default: {
-      const randomNum = Math.floor(Math.random() * 10) + 1
-      return `/videos/real/video${randomNum}.mp4`
-    }
-  }
+  // switch (category) {
+  //   case 'anime': {
+  //     const randomNum = Math.floor(Math.random() * 10) + 1
+  //     return `/videos/anime/video${randomNum}.mp4`
+  //   }
+  //   case 'milf': {
+  //     const randomNum = Math.floor(Math.random() * 10) + 1
+  //     return `/videos/milf/video${randomNum}.mp4`
+  //   }
+  //   case 'ex': {
+  //     const randomNum = Math.floor(Math.random() * 10) + 1
+  //     return `/videos/ex/video${randomNum}.mp4`
+  //   }
+  //   case 'gf':
+  //   default: {
+  //     const randomNum = Math.floor(Math.random() * 10) + 1
+  //     return `/videos/real/video${randomNum}.mp4`
+  //   }
+  // }
 }
 
 function formatChatHistory(messages: Message[]): string {
@@ -145,6 +148,20 @@ function buildFullMessage(ctx: RetryContext, attempt: number): string {
     case 3:
     default:
       return `${systemPrompt}\n${userText}`
+  }
+}
+
+function getPromptForCharacter(category: CharacterCategory, layout: string): string {
+  switch (category) {
+    case 'anime':
+      return getSystemPromptForAnime(layout)
+    case 'milf':
+      return getSystemPromptForMilf(layout)
+    case 'ex':
+      return getSystemPromptForEx(layout)
+    case 'gf':
+    default:
+      return getSystemPrompt(layout)
   }
 }
 
@@ -252,7 +269,8 @@ export function useChat(activeCharacterId: string | null, characterAvatar?: stri
       const shouldBeAudio =
         newAudioMode || lowerText === 'can you send voice messages'.toLowerCase()
 
-      const dynamicPrompt = getSystemPrompt(currentLayout)
+      const category = getCharacterCategory(characterAvatar)
+      const dynamicPrompt = getPromptForCharacter(category, currentLayout)
       const currentMessages = messagesRef.current
       const formattedHistory = formatChatHistory(currentMessages)
 

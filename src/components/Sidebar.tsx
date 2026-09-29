@@ -40,6 +40,14 @@ const BIOS = [
   'Introvert with a big imagination. Let’s create unforgettable memories together.'
 ]
 
+// Получение номера аватарки из пути
+function getAvatarNumber(avatarPath?: string): number {
+  if (!avatarPath) return 0
+  const fileName = avatarPath.split('/').pop() || ''
+  const num = parseInt(fileName, 10)
+  return isNaN(num) ? 0 : num
+}
+
 // Хэш-функция для детерминированной (персистентной) генерации данных по ключу аватара
 function getHash(str: string): number {
   let hash = 0
@@ -60,10 +68,22 @@ function getAvatarKey(avatarPath?: string): string {
 
 // Генерация персистентных данных профиля
 function getProfileForAvatar(avatarPath?: string): GirlProfile {
+  const avatarNum = getAvatarNumber(avatarPath)
+
+  // Явно заданный возраст для MILF (аватарки 21-25)
+  const milfAges: Record<number, number> = {
+    21: 47,
+    22: 58,
+    23: 65,
+    24: 72,
+    25: 41,
+  }
+
   const key = getAvatarKey(avatarPath)
   const hash = getHash(key)
 
-  const age = 19 + (hash % 8) // Возраст строго от 19 до 26
+  // Если номер аватарки есть в маппинге milfAges, берем его, иначе генерируем 19..26
+  const age = milfAges[avatarNum] ?? (19 + (hash % 8))
   const location = LOCATIONS[hash % LOCATIONS.length]
   const bio = BIOS[(hash >> 2) % BIOS.length]
 

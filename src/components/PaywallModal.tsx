@@ -4,9 +4,9 @@ interface PaywallModalProps {
   }
   
   const COIN_PACKS = [
-    { coins: 20, price: '$1', icon: '/photos/coin20.jpg' }, // поменяй расширение на .jpg если у тебя .jpg
-    { coins: 100, price: '$3', icon: '/photos/coin100.jpg' },
-    { coins: 1000, price: '$5', icon: '/photos/coin1000.jpg' },
+    { coins: 20, price: '$0.99', icon: '/photos/coin20.jpg' }, 
+    { coins: 100, price: '$2.99', icon: '/photos/coin100.jpg' },
+    { coins: 1000, price: '$4.99', icon: '/photos/coin1000.jpg' },
   ]
   
   export function PaywallModal({ onClose, onBuyCoins }: PaywallModalProps) {
