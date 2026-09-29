@@ -137,12 +137,17 @@ export const dbService = {
     const stmt = db.prepare('DELETE FROM messages WHERE id = ?')
     stmt.run(id)
   },
-  
+
   clearHistory(): void {
     const stmt = db.prepare('DELETE FROM messages')
     stmt.run()
   },
 
+  clearMessagesByCharacter(characterId: string): void {
+    const stmt = db.prepare('DELETE FROM messages WHERE character_id = ?')
+    stmt.run(characterId)
+  },
+  
   getCharacters(): CharacterRecord[] {
     return db.prepare('SELECT id, name, avatar, mood FROM characters').all() as CharacterRecord[]
   },

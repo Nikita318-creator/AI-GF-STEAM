@@ -27,6 +27,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   deleteMessage: (id: string): Promise<void> =>
     ipcRenderer.invoke('db:delete-message', id),
+
+  clearCharacterHistory: (characterId: string): Promise<void> =>
+    ipcRenderer.invoke('db:clear-character-history', characterId),
   
   getLocale: (): Promise<string> =>
     ipcRenderer.invoke('system:get-locale'),

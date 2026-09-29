@@ -115,7 +115,7 @@ function getRandomPhotoForCharacter(avatarPath?: string): string {
 
 async function getVideoForCharacter(avatarPath?: string): Promise<string | undefined> {
   const category = getCharacterCategory(avatarPath)
-  const api = typeof window !== 'undefined' ? (window.electronAPI as any) : undefined
+  const api = typeof window !== 'undefined' ? ((window.electronAPI || (window as any).electron) as any) : undefined
 
   if (api && typeof api.getVideo === 'function') {
     const fetchedUrl = await api.getVideo(avatarPath, category)
@@ -188,7 +188,7 @@ export function useChat(activeCharacterId: string | null, characterAvatar?: stri
   messagesRef.current = messages
 
   const persistMessage = async (msg: Message, charId: string) => {
-    const api = typeof window !== 'undefined' ? (window.electronAPI as any) : undefined
+    const api = typeof window !== 'undefined' ? ((window.electronAPI || (window as any).electron) as any) : undefined
     if (api && typeof api.saveMessage === 'function') {
       try {
         const rawTimestamp =
@@ -223,7 +223,7 @@ export function useChat(activeCharacterId: string | null, characterAvatar?: stri
       }
 
       try {
-        const api = typeof window !== 'undefined' ? (window.electronAPI as any) : undefined
+        const api = typeof window !== 'undefined' ? ((window.electronAPI || (window as any).electron) as any) : undefined
         if (api && typeof api.getMessagesByCharacter === 'function') {
           const dbRecords = await api.getMessagesByCharacter(activeCharacterId)
           if (Array.isArray(dbRecords)) {
@@ -256,7 +256,7 @@ export function useChat(activeCharacterId: string | null, characterAvatar?: stri
       if (!activeCharacterId) return
 
       let currentLayout = 'en-US'
-      const api = typeof window !== 'undefined' ? (window.electronAPI as any) : undefined
+      const api = typeof window !== 'undefined' ? ((window.electronAPI || (window as any).electron) as any) : undefined
       if (api && typeof api.getKeyboardLayout === 'function') {
         try {
           currentLayout = await api.getKeyboardLayout()
@@ -445,7 +445,6 @@ export function useChat(activeCharacterId: string | null, characterAvatar?: stri
     [activeCharacterId, characterAvatar, isAudioMode]
   )
 
-  // Функция отправки подарка: не стучит в сеть, показывает анимацию печатания и возвращает спайси фотку
   const sendImageMessage = useCallback(
     async (imageUrl: string) => {
       if (!activeCharacterId) return
@@ -462,7 +461,6 @@ export function useChat(activeCharacterId: string | null, characterAvatar?: stri
       setMessages((prev) => [...prev, userMessage])
       await persistMessage(userMessage, activeCharacterId)
 
-      // Включаем тайпинг (симулируем обдумывание/подготовку ответа)
       setIsTyping(true)
       await new Promise((r) => setTimeout(r, 1500))
 
@@ -484,34 +482,56 @@ export function useChat(activeCharacterId: string | null, characterAvatar?: stri
     [activeCharacterId, characterAvatar]
   )
 
+  const deleteMessage = useCallback(
+    async (messageId: string) => {
+      if (!activeCharacterId) return
 
-const deleteMessage = useCallback(
-  async (messageId: string) => {
+      setMessages((prev) => prev.filter((m) => m.id !== messageId))
+
+      try {
+        const api = typeof window !== 'undefined' ? ((window.electronAPI || (window as any).electron) as any) : undefined
+        if (api && typeof api.deleteMessage === 'function') {
+          await api.deleteMessage(messageId)
+        }
+      } catch (err) {
+        console.error('Failed to delete message from SQLite:', err)
+      }
+    },
+    [activeCharacterId]
+  )
+
+  // ОЧИСТКА ИСТОРИИ ЧАТА ИЗ БАЗЫ ДАННЫХ
+  const clearHistory = useCallback(async () => {
     if (!activeCharacterId) return
 
-    // 1. Оптимистично удаляем из UI стейта
-    setMessages((prev) => prev.filter((m) => m.id !== messageId))
+    // 1. Очищаем локальное состояние UI
+    setMessages([])
 
-    // 2. Удаляем из SQLite через IPC
+    // 2. Отправляем запрос в SQLite через IPC
     try {
-      const api = typeof window !== 'undefined' ? (window.electronAPI as any) : undefined
-      if (api && typeof api.deleteMessage === 'function') {
-        await api.deleteMessage(messageId)
+      const win = window as any
+      const api = typeof window !== 'undefined' ? (win.electronAPI || win.electron) : undefined
+
+      if (api && typeof api.clearCharacterHistory === 'function') {
+        await api.clearCharacterHistory(activeCharacterId)
+      } else if (api && typeof api.clearMessagesByCharacter === 'function') {
+        await api.clearMessagesByCharacter(activeCharacterId)
+      } else if (win.ipcRenderer && typeof win.ipcRenderer.invoke === 'function') {
+        await win.ipcRenderer.invoke('db:clear-character-history', activeCharacterId)
       }
     } catch (err) {
-      console.error('Failed to delete message from SQLite:', err)
+      console.error('Failed to clear messages from SQLite:', err)
     }
-  },
-  [activeCharacterId]
-)
+  }, [activeCharacterId])
 
-return {
-  messages,
-  isTyping,
-  isReady,
-  isAudioMode,
-  sendMessage,
-  sendImageMessage,
-  deleteMessage, // <--- Добавлено
-}
+  return {
+    messages,
+    isTyping,
+    isReady,
+    isAudioMode,
+    sendMessage,
+    sendImageMessage,
+    deleteMessage,
+    clearHistory,
+  }
 }

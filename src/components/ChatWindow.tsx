@@ -13,6 +13,7 @@ interface ChatWindowProps {
   onBack: () => void
   onSendGift?: (giftUrl: string) => void
   onDeleteMessage?: (id: string) => void
+  onClearHistory?: () => Promise<void> | void
 }
 
 export function ChatWindow({
@@ -23,12 +24,13 @@ export function ChatWindow({
   onBack,
   onSendGift,
   onDeleteMessage,
+  onClearHistory,
 }: ChatWindowProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false)
   const [isGiftModalOpen, setIsGiftModalOpen] = useState(false)
+  const [isClearAlertOpen, setIsClearAlertOpen] = useState(false)
 
-  // Надежный скролл вниз: отрабатывает при монтировании, изменении сообщений и догрузке любых картинок
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
@@ -37,20 +39,16 @@ export function ChatWindow({
       el.scrollTop = el.scrollHeight
     }
 
-    // 1. Мгновенный скролл
     scrollToBottom()
 
-    // 2. Скролл после завершения текущего кадра layout
     const rafId = requestAnimationFrame(scrollToBottom)
 
-    // 3. Отслеживание асинхронной загрузки картинок (аватарки, медиа в бабблах)
     const handleImageLoad = (e: Event) => {
       if ((e.target as HTMLElement).tagName === 'IMG') {
         scrollToBottom()
       }
     }
 
-    // 4. Отслеживание изменений размера контента
     const resizeObserver = new ResizeObserver(() => {
       scrollToBottom()
     })
@@ -65,22 +63,27 @@ export function ChatWindow({
     }
   }, [messages, isTyping])
 
+  const handleConfirmClear = async () => {
+    setIsClearAlertOpen(false)
+    if (onClearHistory) {
+      await onClearHistory()
+    }
+  }
+
   return (
     <div className="relative flex flex-1 flex-col overflow-hidden bg-surface-dark">
-      {/* 1. Фоновое изображение (backgroundImageView) */}
+      {/* 1. Фоновое изображение */}
       <div className="absolute inset-0 z-0 overflow-hidden">
         <img
           src={characterAvatar}
           alt={characterName}
           className="h-full w-full object-cover blur-[2px] scale-105"
         />
-        {/* 2. Полупрозрачный черный слой поверх фото (backgroundOverlayView) */}
         <div className="absolute inset-0 bg-black/60" />
-        {/* 3. Градиентный слой (gradientLayer) */}
         <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/80" />
       </div>
 
-      {/* Основной контент поверх слоев фона */}
+      {/* Основной контент */}
       <div className="relative z-10 flex h-full flex-col">
         {/* Header */}
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-white/10 bg-black/20 px-4 backdrop-blur-md">
@@ -113,11 +116,15 @@ export function ChatWindow({
             </div>
           </div>
           <div className="flex gap-2">
-            {/* Оставлена только иконка подарка */}
             <HeaderButton
               icon="🎁"
               label="Gift"
               onClick={() => setIsGiftModalOpen(true)}
+            />
+            <HeaderButton
+              icon="🗑️"
+              label="Clear History"
+              onClick={() => setIsClearAlertOpen(true)}
             />
           </div>
         </header>
@@ -177,6 +184,46 @@ export function ChatWindow({
             }
           }}
         />
+      )}
+
+      {/* Нативный кастомный алерт под стиль приложения */}
+      {isClearAlertOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative w-full max-w-sm overflow-hidden rounded-3xl border border-white/15 bg-slate-900/90 p-6 text-center shadow-2xl backdrop-blur-2xl transition-all animate-in zoom-in-95 duration-200">
+            {/* Иконка-акцент */}
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-red-500/10 text-2xl border border-red-500/20 text-red-400">
+              🗑️
+            </div>
+
+            {/* Заголовок и Текст */}
+            <h3 className="font-display text-lg font-semibold text-white">
+              Clear Chat History?
+            </h3>
+            <p className="mt-2 text-sm text-white/60 leading-relaxed">
+              Are you sure you want to clear all history with{' '}
+              <span className="font-medium text-white">{characterName}</span>?
+              This action cannot be undone.
+            </p>
+
+            {/* Кнопки действия */}
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setIsClearAlertOpen(false)}
+                className="flex-1 rounded-xl bg-white/10 px-4 py-3 text-sm font-medium text-white transition-all hover:bg-white/15 active:scale-95"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmClear}
+                className="flex-1 rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-red-600/30 transition-all hover:bg-red-500 active:scale-95"
+              >
+                Clear History
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

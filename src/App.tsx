@@ -17,20 +17,23 @@ export function App() {
   const [characters, setCharacters] = useState<CharacterRecord[]>([])
   const [summaries, setSummaries] = useState<Array<{ character: CharacterRecord; lastMessage?: MessageRecord }>>([])
   
-  // По умолчанию жестко ставим 'friends'
   const [reelsSubTab, setReelsSubTab] = useState<'friends' | 'feed'>('friends')
   const [reels, setReels] = useState<ReelItem[]>([])
 
   const activeCharRecord = characters.find((c) => c.id === selectedCharId)
 
-  // 1. Достали sendImageMessage из хука
-  const { messages, isTyping, isReady, isAudioMode, sendMessage, sendImageMessage, deleteMessage } = useChat(
-    selectedCharId,
-    activeCharRecord?.avatar
-  )
+  const {
+    messages,
+    isTyping,
+    isReady,
+    isAudioMode,
+    sendMessage,
+    sendImageMessage,
+    deleteMessage,
+    clearHistory,
+  } = useChat(selectedCharId, activeCharRecord?.avatar)
 
   const loadSummariesAndReels = useCallback(async () => {
-    // В зависимости от активной подвкладки выбираем нужный пул
     const targetPool = reelsSubTab === 'friends' ? friendsPool : feedPool
     
     const youtubeReels: ReelItem[] = targetPool.map((url, idx) => ({
@@ -42,7 +45,7 @@ export function App() {
     }))
     setReels(youtubeReels)
 
-    const api = typeof window !== 'undefined' ? (window.electronAPI as any) : undefined
+    const api = typeof window !== 'undefined' ? ((window.electronAPI || (window as any).electron) as any) : undefined
     if (api && typeof api.getCharacters === 'function') {
       const chars: CharacterRecord[] = await api.getCharacters()
       setCharacters(chars)
@@ -90,7 +93,6 @@ export function App() {
           <>
             {activeCharacter && <Sidebar character={activeCharacter} />}
             <main className="relative flex flex-1 flex-col">
-              {/* 2. Прокинули onSendGift в ChatWindow */}
               <ChatWindow
                 messages={messages}
                 characterName={activeCharacter?.name || ''}
@@ -98,6 +100,10 @@ export function App() {
                 isTyping={isTyping}
                 onSendGift={sendImageMessage}
                 onDeleteMessage={deleteMessage}
+                onClearHistory={async () => {
+                  await clearHistory()
+                  await loadSummariesAndReels()
+                }}
                 onBack={() => {
                   ttsService.stop()
                   setSelectedCharId(null)
@@ -129,7 +135,6 @@ export function App() {
             )}
             {activeTab === 'reels' && (
               <div className="relative flex-1 h-full w-full">
-                {/* Шапка с подвкладками: Friends активна по дефолту */}
                 <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-4 bg-black/50 backdrop-blur-md px-5 py-2 rounded-full border border-white/10 shadow-lg">
                   <button
                     type="button"
