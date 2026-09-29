@@ -1,3 +1,5 @@
+// src/components/ReelsView.tsx
+
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react'
 import {
   Heart as HeartIcon,
@@ -9,6 +11,8 @@ import {
   Play as PlayIcon,
 } from 'lucide-react'
 import { extractVideoId, feedPool } from './feedVM'
+import { subscriptionService } from '@/services/subscriptionService'
+import { BasePaywallModal } from './BasePaywallModal'
 
 declare global {
   interface Window {
@@ -106,6 +110,7 @@ export const ReelsView: React.FC<ReelsViewProps> = ({ reels: initialReels = [] }
   
   const [isMuted, setIsMuted] = useState(true)
   const [isApiReady, setIsApiReady] = useState(false)
+  const [isPaywallOpen, setIsPaywallOpen] = useState(false)
 
   const containerRef = useRef<HTMLDivElement>(null)
   const sourcePoolRef = useRef<ReelItem[] | string[]>(feedPool)
@@ -114,6 +119,8 @@ export const ReelsView: React.FC<ReelsViewProps> = ({ reels: initialReels = [] }
   const hasDraggedRef = useRef(false)
   const startYRef = useRef(0)
   const [isDragging, setIsDragging] = useState(false)
+
+  const MAX_FREE_REELS = 3
 
   useEffect(() => {
     if (window.YT && window.YT.Player) {
@@ -165,6 +172,17 @@ export const ReelsView: React.FC<ReelsViewProps> = ({ reels: initialReels = [] }
     if (height === 0) return
     const newIndex = Math.round(containerRef.current.scrollTop / height)
     
+    // Проверка наличия подписки при попытке уйти ниже бесплатного лимита
+    if (!subscriptionService.hasSubscription && newIndex >= MAX_FREE_REELS) {
+      // Откатываем скролл обратно на 3-й элемент
+      containerRef.current.scrollTo({
+        top: (MAX_FREE_REELS - 1) * height,
+        behavior: 'smooth',
+      })
+      setIsPaywallOpen(true)
+      return
+    }
+
     if (newIndex !== activeIndex && newIndex >= 0 && newIndex < items.length) {
       setActiveIndex(newIndex)
     }
@@ -174,7 +192,7 @@ export const ReelsView: React.FC<ReelsViewProps> = ({ reels: initialReels = [] }
     }
   }
 
-  // --- МЫШИНЫЙ DRAG / SWIPE С ФИЛЬТРАЦИЕЙ КЛИКА ---
+  // --- МЫШИНЫЙ DRAG / SWIPE С ФИЛЬТРАЦИЕЙ КЛИКА И ПЕЙВОЛОМ ---
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return
     isDraggingRef.current = true
@@ -205,6 +223,11 @@ export const ReelsView: React.FC<ReelsViewProps> = ({ reels: initialReels = [] }
     if (Math.abs(deltaY) > SWIPE_THRESHOLD) {
       let targetIndex = activeIndex
       if (deltaY > 0) {
+        // Свайп вниз (к следующим видосам)
+        if (!subscriptionService.hasSubscription && activeIndex >= MAX_FREE_REELS - 1) {
+          setIsPaywallOpen(true)
+          return
+        }
         targetIndex = Math.min(activeIndex + 1, items.length - 1)
       } else {
         targetIndex = Math.max(activeIndex - 1, 0)
@@ -229,6 +252,10 @@ export const ReelsView: React.FC<ReelsViewProps> = ({ reels: initialReels = [] }
 
       if (containerRef.current) {
         const nextIndex = failedIndex + 1
+        if (!subscriptionService.hasSubscription && nextIndex >= MAX_FREE_REELS) {
+          setIsPaywallOpen(true)
+          return
+        }
         const height = containerRef.current.clientHeight
         containerRef.current.scrollTo({
           top: nextIndex * height,
@@ -270,35 +297,44 @@ export const ReelsView: React.FC<ReelsViewProps> = ({ reels: initialReels = [] }
   }
 
   return (
-    <div
-      ref={containerRef}
-      onScroll={handleScroll}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseLeave}
-      className={`h-full w-full overflow-y-snap snap-y snap-mandatory overflow-y-auto bg-black relative select-none ${
-        isDragging ? 'cursor-grabbing' : 'cursor-grab'
-      }`}
-    >
-      {items.map((reel, index) => (
-        <ReelCard
-          key={reel.id}
-          index={index}
-          reel={reel}
-          isFirst={index === 0}
-          isActive={index === activeIndex}
-          isApiReady={isApiReady}
-          isMuted={isMuted}
-          hasDraggedRef={hasDraggedRef}
-          onToggleMute={handleToggleMuteGlobal}
-          isLiked={!!likedMap[reel.id]}
-          likesCount={likesCountMap[reel.id] ?? reel.likesCount ?? 0}
-          onToggleLike={() => toggleLike(reel)}
-          onError={(reason) => handleVideoError(index, reason)}
-        />
-      ))}
-    </div>
+    <>
+      <div
+        ref={containerRef}
+        onScroll={handleScroll}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseLeave}
+        className={`h-full w-full overflow-y-snap snap-y snap-mandatory overflow-y-auto bg-black relative select-none ${
+          isDragging ? 'cursor-grabbing' : 'cursor-grab'
+        }`}
+      >
+        {items.map((reel, index) => (
+          <ReelCard
+            key={reel.id}
+            index={index}
+            reel={reel}
+            isFirst={index === 0}
+            isActive={index === activeIndex}
+            isApiReady={isApiReady}
+            isMuted={isMuted}
+            hasDraggedRef={hasDraggedRef}
+            onToggleMute={handleToggleMuteGlobal}
+            isLiked={!!likedMap[reel.id]}
+            likesCount={likesCountMap[reel.id] ?? reel.likesCount ?? 0}
+            onToggleLike={() => toggleLike(reel)}
+            onError={(reason) => handleVideoError(index, reason)}
+          />
+        ))}
+      </div>
+
+      {/* Единый Paywall при ограничении просмотра */}
+      <BasePaywallModal
+        isOpen={isPaywallOpen}
+        onClose={() => setIsPaywallOpen(false)}
+        title="Unlock Unlimited Reels"
+      />
+    </>
   )
 }
 
@@ -404,7 +440,6 @@ const ReelCard: React.FC<ReelCardProps> = memo(({
   }, [isActive, isApiReady, videoId])
 
   const handleTogglePlay = () => {
-    // Если был драг/свайп — игнорируем клик и не ставим на паузу!
     if (hasDraggedRef.current) {
       hasDraggedRef.current = false
       return
@@ -495,7 +530,7 @@ const ReelCard: React.FC<ReelCardProps> = memo(({
           </div>
         )}
 
-        {/* Прозрачное одеяло для Play/Pause (игнорирует драг) */}
+        {/* Прозрачное одеяло для Play/Pause */}
         <div onClick={handleTogglePlay} className="absolute inset-0 cursor-pointer z-10" />
 
         {/* Иконка паузы по центру */}
@@ -505,7 +540,7 @@ const ReelCard: React.FC<ReelCardProps> = memo(({
           </div>
         )}
 
-        {/* Аватарка прижата К СТЕНКАМ (верх-лево), ник ПОД НЕЙ */}
+        {/* Аватарка прижата К СТЕНКАМ */}
         <div className="absolute top-0 left-0 z-20 flex flex-col items-start pointer-events-none">
           {reel.authorAvatar ? (
             <img
@@ -523,7 +558,7 @@ const ReelCard: React.FC<ReelCardProps> = memo(({
           </span>
         </div>
 
-        {/* Кнопка звука — ПРАВЫЙ ВЕРХНИЙ УГОЛ */}
+        {/* Кнопка звука */}
         <button
           onClick={handleToggleMuteClick}
           className="absolute top-4 right-4 z-20 rounded-full bg-black/40 p-3 text-white backdrop-blur-md hover:bg-black/60 transition-colors active:scale-95 border border-white/10"
@@ -531,7 +566,7 @@ const ReelCard: React.FC<ReelCardProps> = memo(({
           {isMuted ? <VolumeXIcon className="h-5 w-5" /> : <Volume2Icon className="h-5 w-5" />}
         </button>
 
-        {/* Кнопка Лайка — ВНИЗУ СПРАВА */}
+        {/* Кнопка Лайка */}
         <div className="absolute bottom-6 right-4 z-20 flex flex-col items-center gap-1">
           <button
             onClick={handleToggleLikeClick}

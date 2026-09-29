@@ -1,7 +1,11 @@
+// src/components/MessageBubble.tsx
+
 import { useState, useEffect } from 'react'
 import type { Message } from '@/types/chat'
 import { PhotoModal } from './PhotoModal'
 import { ttsService } from '@/services/ttsService'
+import { subscriptionService } from '@/services/subscriptionService'
+import { BasePaywallModal } from './BasePaywallModal'
 
 interface MessageBubbleProps {
   message: Message
@@ -24,9 +28,13 @@ export function MessageBubble({
   const isUser = message.role === 'user'
   const [isPhotoOpen, setIsPhotoOpen] = useState(false)
   const [isVideoOpen, setIsVideoOpen] = useState(false)
+  const [isPaywallOpen, setIsPaywallOpen] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [localAudioUrl, setLocalAudioUrl] = useState<string | undefined>(message.audioUrl)
+
+  // Статус подписки (пока моковый)
+  const hasSub = subscriptionService.hasSubscription
 
   // Стейт позиционирования контекстного меню
   const [contextMenu, setContextMenu] = useState<ContextMenuPosition | null>(null)
@@ -114,6 +122,23 @@ export function MessageBubble({
     }
   }
 
+  // Обработчики открытия фото/видео с проверкой подписки
+  const handlePhotoClick = () => {
+    if (!hasSub) {
+      setIsPaywallOpen(true)
+    } else {
+      setIsPhotoOpen(true)
+    }
+  }
+
+  const handleVideoClick = () => {
+    if (!hasSub) {
+      setIsPaywallOpen(true)
+    } else {
+      setIsVideoOpen(true)
+    }
+  }
+
   return (
     <>
       <div
@@ -122,7 +147,7 @@ export function MessageBubble({
         {!isUser && (
           <div
             className="h-8 w-8 shrink-0 overflow-hidden rounded-full ring-1 ring-white/10 cursor-pointer hover:opacity-80 transition-opacity"
-            onClick={() => setIsPhotoOpen(true)}
+            onClick={handlePhotoClick}
           >
             <img
               src={characterAvatar}
@@ -150,36 +175,53 @@ export function MessageBubble({
             {/* Картинка */}
             {message.imageUrl && (
               <div
-                className="mb-2 overflow-hidden rounded-xl cursor-pointer hover:opacity-95 transition-opacity"
-                onClick={() => setIsPhotoOpen(true)}
+                className="relative mb-2 overflow-hidden rounded-xl cursor-pointer hover:opacity-95 transition-opacity group"
+                onClick={handlePhotoClick}
               >
                 <img
                   src={message.imageUrl}
                   alt="Photo response"
-                  className="max-h-80 w-full object-cover rounded-xl"
+                  className={`max-h-80 w-full object-cover rounded-xl transition-all duration-300 ${
+                    !hasSub ? 'blur-xl scale-105 select-none' : ''
+                  }`}
                   loading="lazy"
                 />
+                {!hasSub && (
+                  <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex flex-col items-center justify-center text-white gap-1 p-2 text-center">
+                    <span className="text-2xl">🔒</span>
+                    <span className="text-xs font-semibold text-white/90">Click to Unlock Photo</span>
+                  </div>
+                )}
               </div>
             )}
 
             {/* Видео */}
             {message.videoUrl && (
               <div 
-                className="mb-2 overflow-hidden rounded-xl cursor-pointer relative group"
-                onClick={() => setIsVideoOpen(true)}
+                className="relative mb-2 overflow-hidden rounded-xl cursor-pointer group"
+                onClick={handleVideoClick}
               >
                 <video
                   src={message.videoUrl}
                   playsInline
                   preload="metadata"
                   loop
-                  className="max-h-80 w-full object-cover rounded-xl pointer-events-none"
+                  className={`max-h-80 w-full object-cover rounded-xl pointer-events-none transition-all duration-300 ${
+                    !hasSub ? 'blur-xl scale-105 select-none' : ''
+                  }`}
                 />
-                <div className="absolute inset-0 bg-black/20 group-hover:bg-black/0 transition-colors flex items-center justify-center">
-                  <div className="w-10 h-10 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center text-white shadow-lg">
-                    ▶
+                {!hasSub ? (
+                  <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex flex-col items-center justify-center text-white gap-1 p-2 text-center">
+                    <span className="text-2xl">🔒</span>
+                    <span className="text-xs font-semibold text-white/90">Click to Unlock Video</span>
                   </div>
-                </div>
+                ) : (
+                  <div className="absolute inset-0 bg-black/20 group-hover:bg-black/0 transition-colors flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center text-white shadow-lg">
+                      ▶
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -248,7 +290,7 @@ export function MessageBubble({
         </div>
       </div>
 
-      {/* Выпадающее Контекстное Меню (в стиле iOS Context Menu) */}
+      {/* Выпадающее Контекстное Меню */}
       {contextMenu && (
         <div
           style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }}
@@ -313,6 +355,12 @@ export function MessageBubble({
           </div>
         </div>
       )}
+
+      {/* Модалка Paywall при попытке зайти в платную зону */}
+      <BasePaywallModal
+        isOpen={isPaywallOpen}
+        onClose={() => setIsPaywallOpen(false)}
+      />
     </>
   )
 }
