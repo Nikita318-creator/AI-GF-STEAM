@@ -15,6 +15,15 @@ interface Tile {
   isMerged?: boolean
 }
 
+interface Saved2048State {
+  tiles: Tile[]
+  maxId: number
+  gameOver: boolean
+  gameWon: boolean
+}
+
+const STORAGE_KEY_2048 = 'game_2048_saved_state'
+
 const GAME_RULES = `
 • Slide tiles using Arrow keys, Mouse Drag (click & swipe), or Mobile Touch Swipes.
 • When two tiles with the same number touch, they merge into one!
@@ -27,9 +36,43 @@ let tileIdCounter = 0
 const getRandomTileValue = () => (Math.random() < 0.9 ? 2 : 4)
 
 export const Game2048: React.FC<GameProps> = ({ onBack }) => {
-  const [tiles, setTiles] = useState<Tile[]>([])
-  const [gameOver, setGameOver] = useState<boolean>(false)
-  const [gameWon, setGameWon] = useState<boolean>(false)
+  const [tiles, setTiles] = useState<Tile[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY_2048)
+    if (saved) {
+      try {
+        const parsed: Saved2048State = JSON.parse(saved)
+        if (parsed.tiles && Array.isArray(parsed.tiles) && parsed.tiles.length > 0) {
+          tileIdCounter = parsed.maxId || parsed.tiles.reduce((max, t) => Math.max(max, t.id), 0)
+          return parsed.tiles
+        }
+      } catch (e) {
+        console.error('Failed to parse saved 2048 state', e)
+      }
+    }
+    return []
+  })
+
+  const [gameOver, setGameOver] = useState<boolean>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY_2048)
+    if (saved) {
+      try {
+        const parsed: Saved2048State = JSON.parse(saved)
+        return parsed.gameOver || false
+      } catch (e) {}
+    }
+    return false
+  })
+
+  const [gameWon, setGameWon] = useState<boolean>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY_2048)
+    if (saved) {
+      try {
+        const parsed: Saved2048State = JSON.parse(saved)
+        return parsed.gameWon || false
+      } catch (e) {}
+    }
+    return false
+  })
 
   const pointerStartPos = useRef<{ x: number; y: number } | null>(null)
 
@@ -59,6 +102,7 @@ export const Game2048: React.FC<GameProps> = ({ onBack }) => {
   }
 
   const initBoard = useCallback(() => {
+    localStorage.removeItem(STORAGE_KEY_2048)
     tileIdCounter = 0
     let initialTiles: Tile[] = []
     initialTiles = addRandomTileToTiles(initialTiles)
@@ -69,8 +113,30 @@ export const Game2048: React.FC<GameProps> = ({ onBack }) => {
   }, [])
 
   useEffect(() => {
-    initBoard()
-  }, [initBoard])
+    if (tiles.length === 0) {
+      initBoard()
+    }
+  }, [initBoard, tiles.length])
+
+  // Save current board state to localStorage whenever state changes
+  useEffect(() => {
+    if (tiles.length === 0) return
+
+    if (gameOver || gameWon) {
+      localStorage.removeItem(STORAGE_KEY_2048)
+    } else {
+      const activeTiles = tiles.filter((t) => !t.mergedInto)
+      const maxId = activeTiles.reduce((max, t) => Math.max(max, t.id), tileIdCounter)
+
+      const stateToSave: Saved2048State = {
+        tiles: activeTiles,
+        maxId,
+        gameOver,
+        gameWon,
+      }
+      localStorage.setItem(STORAGE_KEY_2048, JSON.stringify(stateToSave))
+    }
+  }, [tiles, gameOver, gameWon])
 
   const checkGameOver = (activeTiles: Tile[]): boolean => {
     if (activeTiles.length < 16) return false
@@ -290,7 +356,7 @@ export const Game2048: React.FC<GameProps> = ({ onBack }) => {
               )}
               {!gameWon && !gameOver && (
                 <span className="text-xs font-medium text-white/50">
-                  Swipe, Drag with Mouse, or Use Arrow Keys
+                  Use Arrow Keys or Swipe to move tiles
                 </span>
               )}
             </div>
@@ -313,18 +379,17 @@ export const Game2048: React.FC<GameProps> = ({ onBack }) => {
                   ))}
               </div>
 
-              {/* Dynamic Sliding Overlay Tiles */}
-              <div className="absolute inset-2.5 pointer-events-none">
+              {/* Dynamic Sliding Overlay Grid */}
+              <div className="absolute inset-2.5 grid grid-cols-4 grid-rows-4 gap-2 pointer-events-none">
                 {tiles.map((tile) => {
                   return (
                     <div
                       key={tile.id}
                       style={{
-                        top: `${tile.row * 25}%`,
-                        left: `${tile.col * 25}%`,
-                        transition: 'top 180ms cubic-bezier(0.25, 1, 0.5, 1), left 180ms cubic-bezier(0.25, 1, 0.5, 1)',
+                        transform: `translate3d(calc(${tile.col} * 100% + ${tile.col} * 0.5rem), calc(${tile.row} * 100% + ${tile.row} * 0.5rem), 0)`,
+                        transition: 'transform 180ms cubic-bezier(0.25, 1, 0.5, 1)',
                       }}
-                      className={`absolute w-1/4 h-1/4 p-1 transform-gpu ${
+                      className={`absolute top-0 left-0 w-[calc((100%-1.5rem)/4)] h-[calc((100%-1.5rem)/4)] transform-gpu ${
                         tile.mergedInto ? 'z-0 opacity-0' : tile.isMerged ? 'z-20' : 'z-10'
                       }`}
                     >
