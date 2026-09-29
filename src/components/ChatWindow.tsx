@@ -28,11 +28,40 @@ export function ChatWindow({
   const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false)
   const [isGiftModalOpen, setIsGiftModalOpen] = useState(false)
 
-  // Аналог viewWillAppear / viewDidAppear в Swift: скроллим вниз при монтировании и изменении сообщений
+  // Надежный скролл вниз: отрабатывает при монтировании, изменении сообщений и догрузке любых картинок
   useEffect(() => {
     const el = scrollRef.current
-    if (el) {
+    if (!el) return
+
+    const scrollToBottom = () => {
       el.scrollTop = el.scrollHeight
+    }
+
+    // 1. Мгновенный скролл
+    scrollToBottom()
+
+    // 2. Скролл после завершения текущего кадра layout
+    const rafId = requestAnimationFrame(scrollToBottom)
+
+    // 3. Отслеживание асинхронной загрузки картинок (аватарки, медиа в бабблах)
+    const handleImageLoad = (e: Event) => {
+      if ((e.target as HTMLElement).tagName === 'IMG') {
+        scrollToBottom()
+      }
+    }
+
+    // 4. Отслеживание изменений размера контента
+    const resizeObserver = new ResizeObserver(() => {
+      scrollToBottom()
+    })
+
+    el.addEventListener('load', handleImageLoad, true)
+    resizeObserver.observe(el)
+
+    return () => {
+      cancelAnimationFrame(rafId)
+      el.removeEventListener('load', handleImageLoad, true)
+      resizeObserver.disconnect()
     }
   }, [messages, isTyping])
 
