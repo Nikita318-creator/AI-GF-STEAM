@@ -6,6 +6,7 @@ import { Sidebar } from '@/components/Sidebar'
 import { TabBar, TabType } from '@/components/TabBar'
 import { CreateGfView } from '@/components/CreateGfView'
 import { ReelsView, ReelItem } from '@/components/ReelsView'
+import { GamesView } from '@/components/GamesView'
 import { useChat } from '@/hooks/useChat'
 import { ttsService } from '@/services/ttsService'
 import { feedPool, friendsPool } from '@/components/feedVM'
@@ -163,6 +164,7 @@ export function App() {
                 <ReelsView reels={reels} />
               </div>
             )}
+            {activeTab === 'games' && <GamesView />}
           </>
         )}
       </div>

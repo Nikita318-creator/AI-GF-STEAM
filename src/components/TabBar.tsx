@@ -1,4 +1,4 @@
-export type TabType = 'chats' | 'create' | 'reels'
+export type TabType = 'chats' | 'create' | 'reels' | 'games'
 
 interface TabBarProps {
   activeTab: TabType
@@ -22,7 +22,7 @@ export function TabBar({ activeTab, onTabChange }: TabBarProps) {
         onClick={() => onTabChange('create')}
         className={`flex flex-col items-center py-1 px-4 rounded-xl transition-all ${
           activeTab === 'create' ? 'text-accent scale-105' : 'text-white/50 hover:text-white/80'
-      }`}
+        }`}
       >
         <span className="text-xl">✨</span>
         <span className="text-xs font-medium mt-0.5">Create GF</span>
@@ -36,6 +36,16 @@ export function TabBar({ activeTab, onTabChange }: TabBarProps) {
       >
         <span className="text-xl">🎬</span>
         <span className="text-xs font-medium mt-0.5">Reels</span>
+      </button>
+
+      <button
+        onClick={() => onTabChange('games')}
+        className={`flex flex-col items-center py-1 px-4 rounded-xl transition-all ${
+          activeTab === 'games' ? 'text-accent scale-105' : 'text-white/50 hover:text-white/80'
+        }`}
+      >
+        <span className="text-xl">🎮</span>
+        <span className="text-xs font-medium mt-0.5">Games</span>
       </button>
     </div>
   )
