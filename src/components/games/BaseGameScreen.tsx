@@ -8,7 +8,7 @@ export interface GameScore {
 
 interface BaseGameScreenProps {
   gameId: string
-  gameIndex: number // e.g. 1 for TicTacToe (waifuGame1_X), 2 for Checkers, etc.
+  gameIndex: number
   title: string
   rulesText: string
   opponentName?: string
@@ -49,8 +49,7 @@ export const BaseGameScreen: React.FC<BaseGameScreenProps> = ({
     localStorage.setItem(scoreStorageKey, JSON.stringify(score))
   }, [score, scoreStorageKey])
 
-  // Calculate waifu photo index based on wins (1 to 10)
-  const photoIndex = Math.min(Math.max(score.wins + 1, 1), 10)
+  const photoIndex = Math.min(Math.max(score.wins + 1, 1), 11)
   const currentPhotoUrl = `/photos/waifuGame${gameIndex}_${photoIndex}.jpg`
 
   const updateScore = (result: 'win' | 'loss' | 'draw') => {
@@ -67,7 +66,7 @@ export const BaseGameScreen: React.FC<BaseGameScreenProps> = ({
 
   return (
     <div className="flex flex-col h-full w-full bg-slate-950 text-white select-none relative overflow-hidden">
-      {/* Navigation Header */}
+      {/* Top Header Navigation */}
       <header className="flex items-center justify-between px-4 py-3 bg-slate-900/80 border-b border-white/10 backdrop-blur-md z-10">
         <button
           onClick={onBack}
@@ -76,29 +75,29 @@ export const BaseGameScreen: React.FC<BaseGameScreenProps> = ({
           <span>←</span> Back
         </button>
 
-        <div className="flex items-center gap-2">
-          <h1 className="text-lg font-bold tracking-wide text-white">{title}</h1>
+        <h1 className="text-lg font-bold tracking-wide text-white">{title}</h1>
+
+        <div className="flex items-center gap-3">
+          {/* Rules Popup Trigger Button */}
           <button
             onClick={() => setShowRules(true)}
-            className="w-7 h-7 rounded-full bg-indigo-600/30 border border-indigo-400/40 hover:bg-indigo-600/50 flex items-center justify-center text-xs font-bold text-indigo-300 transition-all active:scale-90"
-            title="Game Rules"
+            className="px-3 py-1.5 rounded-xl bg-indigo-600/30 border border-indigo-500/40 hover:bg-indigo-600/50 flex items-center gap-1.5 text-xs font-bold text-indigo-300 transition-all active:scale-95 shadow-md"
           >
-            ℹ️
+            <span>ℹ️</span> Rules
+          </button>
+
+          <button
+            onClick={resetScore}
+            className="text-xs text-white/40 hover:text-white/80 transition-colors"
+            title="Reset stats"
+          >
+            Reset
           </button>
         </div>
-
-        <button
-          onClick={resetScore}
-          className="text-xs text-white/40 hover:text-white/80 transition-colors"
-          title="Reset stats"
-        >
-          Reset
-        </button>
       </header>
 
       {/* Persistent Scoreboard Panel */}
       <div className="px-4 py-2.5 bg-slate-900/50 border-b border-white/5 flex items-center justify-between shadow-inner z-10">
-        {/* Player Profile */}
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-full bg-indigo-600/30 border border-indigo-500/50 flex items-center justify-center font-bold text-xs text-indigo-300 shadow-md">
             YOU
@@ -109,7 +108,6 @@ export const BaseGameScreen: React.FC<BaseGameScreenProps> = ({
           </div>
         </div>
 
-        {/* Score Counter Badge */}
         <div className="flex flex-col items-center justify-center px-4 py-1 rounded-xl bg-black/40 border border-white/10">
           <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Score</span>
           <span className="text-sm font-extrabold text-white">
@@ -120,7 +118,6 @@ export const BaseGameScreen: React.FC<BaseGameScreenProps> = ({
           )}
         </div>
 
-        {/* AI Opponent Profile */}
         <div className="flex items-center gap-2.5">
           <div className="text-right">
             <p className="text-xs font-semibold text-white">{opponentName}</p>
@@ -134,14 +131,12 @@ export const BaseGameScreen: React.FC<BaseGameScreenProps> = ({
         </div>
       </div>
 
-      {/* Main Game Layout (Split View: Game Canvas + Waifu Card) */}
+      {/* Game + Waifu Split Layout */}
       <main className="flex-1 flex flex-row items-center justify-center p-4 gap-6 overflow-hidden relative">
-        {/* Left/Center: Game Component */}
         <div className="flex-1 flex flex-col items-center justify-center h-full max-w-md">
           {children && children({ score, updateScore, resetScore, currentPhotoUrl })}
         </div>
 
-        {/* Right: Waifu Full Card & Challenge Text */}
         <div className="hidden lg:flex flex-col w-72 h-full max-h-[520px] rounded-2xl bg-slate-900/80 border border-white/10 p-3 shadow-2xl backdrop-blur-xl justify-between shrink-0">
           <div className="relative w-full h-3/4 rounded-xl overflow-hidden border border-white/10 bg-slate-800">
             <img
@@ -162,17 +157,17 @@ export const BaseGameScreen: React.FC<BaseGameScreenProps> = ({
         </div>
       </main>
 
-      {/* Rules Modal Dialog */}
+      {/* Rules Modal Window */}
       {showRules && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-2xl bg-slate-900 border border-white/10 p-6 shadow-2xl flex flex-col gap-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="w-full max-w-md rounded-2xl bg-slate-900 border border-white/10 p-6 shadow-2xl flex flex-col gap-4 relative">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <h2 className="text-lg font-bold text-white flex items-center gap-2">
                 <span>📖</span> {title} Rules
               </h2>
               <button
                 onClick={() => setShowRules(false)}
-                className="text-white/40 hover:text-white text-lg font-bold"
+                className="text-white/40 hover:text-white text-lg font-bold w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10"
               >
                 ✕
               </button>
@@ -182,7 +177,7 @@ export const BaseGameScreen: React.FC<BaseGameScreenProps> = ({
             </p>
             <button
               onClick={() => setShowRules(false)}
-              className="mt-2 w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm transition-all"
+              className="mt-2 w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm transition-all active:scale-98"
             >
               Got it!
             </button>
