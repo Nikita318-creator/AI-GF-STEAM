@@ -23,7 +23,8 @@ export function App() {
 
   const activeCharRecord = characters.find((c) => c.id === selectedCharId)
 
-  const { messages, isTyping, isReady, isAudioMode, sendMessage } = useChat(
+  // 1. Достали sendImageMessage из хука
+  const { messages, isTyping, isReady, isAudioMode, sendMessage, sendImageMessage } = useChat(
     selectedCharId,
     activeCharRecord?.avatar
   )
@@ -89,11 +90,13 @@ export function App() {
           <>
             {activeCharacter && <Sidebar character={activeCharacter} />}
             <main className="relative flex flex-1 flex-col">
+              {/* 2. Прокинули onSendGift в ChatWindow */}
               <ChatWindow
                 messages={messages}
                 characterName={activeCharacter?.name || ''}
                 characterAvatar={activeCharacter?.avatar || ''}
                 isTyping={isTyping}
+                onSendGift={sendImageMessage}
                 onBack={() => {
                   ttsService.stop()
                   setSelectedCharId(null)
@@ -117,12 +120,12 @@ export function App() {
               />
             )}
             {activeTab === 'create' && (
-  <CreateGfView
-    onSelectChat={(id) => {
-      setSelectedCharId(id)
-    }}
-  />
-)}
+              <CreateGfView
+                onSelectChat={(id) => {
+                  setSelectedCharId(id)
+                }}
+              />
+            )}
             {activeTab === 'reels' && (
               <div className="relative flex-1 h-full w-full">
                 {/* Шапка с подвкладками: Friends активна по дефолту */}

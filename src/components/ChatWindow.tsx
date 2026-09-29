@@ -3,6 +3,7 @@ import type { Message } from '@/types/chat'
 import { MessageBubble } from './MessageBubble'
 import { TypingIndicator } from './TypingIndicator'
 import { PhotoModal } from './PhotoModal'
+import { GiftModal } from '@/components/GiftModal'
 
 interface ChatWindowProps {
   messages: Message[]
@@ -10,6 +11,7 @@ interface ChatWindowProps {
   characterAvatar: string
   isTyping: boolean
   onBack: () => void
+  onSendGift?: (giftUrl: string) => void
 }
 
 export function ChatWindow({
@@ -18,9 +20,11 @@ export function ChatWindow({
   characterAvatar,
   isTyping,
   onBack,
+  onSendGift,
 }: ChatWindowProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false)
+  const [isGiftModalOpen, setIsGiftModalOpen] = useState(false)
 
   // Аналог viewWillAppear / viewDidAppear в Swift: скроллим вниз при монтировании и изменении сообщений
   useEffect(() => {
@@ -78,8 +82,12 @@ export function ChatWindow({
             </div>
           </div>
           <div className="flex gap-2">
-            <HeaderButton icon="📞" label="Call" />
-            <HeaderButton icon="🎁" label="Gift" />
+            {/* Оставлена только иконка подарка */}
+            <HeaderButton
+              icon="🎁"
+              label="Gift"
+              onClick={() => setIsGiftModalOpen(true)}
+            />
           </div>
         </header>
 
@@ -126,16 +134,37 @@ export function ChatWindow({
           onClose={() => setIsAvatarModalOpen(false)}
         />
       )}
+
+      {/* Модальное окно выбора подарков */}
+      {isGiftModalOpen && (
+        <GiftModal
+          onClose={() => setIsGiftModalOpen(false)}
+          onSelectGift={(giftUrl) => {
+            if (onSendGift) {
+              onSendGift(giftUrl)
+            }
+          }}
+        />
+      )}
     </div>
   )
 }
 
-function HeaderButton({ icon, label }: { icon: string; label: string }) {
+function HeaderButton({
+  icon,
+  label,
+  onClick,
+}: {
+  icon: string
+  label: string
+  onClick?: () => void
+}) {
   return (
     <button
       type="button"
       title={label}
-      className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 text-sm backdrop-blur-md transition-colors hover:bg-white/20"
+      onClick={onClick}
+      className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 text-sm backdrop-blur-md transition-colors hover:bg-white/20 active:scale-95"
     >
       {icon}
     </button>

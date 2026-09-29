@@ -55,36 +55,33 @@ function getRandomPhotoForCharacter(avatarPath?: string): string {
       return `/photos/ex${randomNum}.jpg`
     }
     case 'gf':
-      default: {
-        const blondeAvatars = [1, 2, 4, 7, 10]
-        const brunetteAvatars = [3, 5, 6, 8, 9]
-  
-        if (blondeAvatars.includes(avatarNum)) {
-          const randomNum = Math.floor(Math.random() * 124) + 1
-          return `/photos/pic${randomNum}.jpg`
-        } else if (brunetteAvatars.includes(avatarNum)) {
-          const randomNum = Math.floor(Math.random() * 115) + 1
-          return `/photos/photo${randomNum}.jpg`
-        } else {
-          // Проверяем, содержат ли avatarPath или avatarNum префикс myGF
-          const match = avatarPath?.match(/myGF(\d+)/i)
-  
-          if (match) {
-            const num = parseInt(match[1], 10)
-  
-            // Распределяем по парам: 1-2 -> 1, 3-4 -> 2, 5-6 -> 3, 7-8 -> 4
-            if (num >= 1 && num <= 8) {
-              const groupNum = Math.ceil(num / 2)
-              const randomPhotoNum = Math.floor(Math.random() * 15) + 1
-              return `/photos/MyGF_${groupNum}_${randomPhotoNum}.jpg`
-            }
+    default: {
+      const blondeAvatars = [1, 2, 4, 7, 10]
+      const brunetteAvatars = [3, 5, 6, 8, 9]
+
+      if (blondeAvatars.includes(avatarNum)) {
+        const randomNum = Math.floor(Math.random() * 124) + 1
+        return `/photos/pic${randomNum}.jpg`
+      } else if (brunetteAvatars.includes(avatarNum)) {
+        const randomNum = Math.floor(Math.random() * 115) + 1
+        return `/photos/photo${randomNum}.jpg`
+      } else {
+        const match = avatarPath?.match(/myGF(\d+)/i)
+
+        if (match) {
+          const num = parseInt(match[1], 10)
+
+          if (num >= 1 && num <= 8) {
+            const groupNum = Math.ceil(num / 2)
+            const randomPhotoNum = Math.floor(Math.random() * 15) + 1
+            return `/photos/MyGF_${groupNum}_${randomPhotoNum}.jpg`
           }
-  
-          // Дефолтный фоллбек, если под myGFX не подошло
-          const randomNum = Math.floor(Math.random() * 124) + 1
-          return `/photos/pic${randomNum}.jpg`
         }
+
+        const randomNum = Math.floor(Math.random() * 124) + 1
+        return `/photos/pic${randomNum}.jpg`
       }
+    }
   }
 }
 
@@ -124,7 +121,7 @@ function formatChatHistory(messages: Message[]): string {
   const formatted = recentMessages
     .map((msg) => {
       const prefix = msg.role === 'assistant' ? '[girlfriend:]' : '[user:]'
-      return `${prefix} ${msg.content}`
+      return `${prefix} ${msg.content || (msg.imageUrl ? '[Sent a photo/gift]' : '')}`
     })
     .join('\n')
 
@@ -334,19 +331,16 @@ export function useChat(activeCharacterId: string | null, characterAvatar?: stri
           let imageUrl: string | undefined = undefined
           let videoUrl: string | undefined = undefined
 
-          // Обработка тега [photo]
           if (rawContent.toLowerCase().includes('[photo]')) {
             imageUrl = getRandomPhotoForCharacter(characterAvatar)
             rawContent = rawContent.replace(/\[photo\]/gi, '').trim()
           }
 
-          // Обработка тега [video]
           if (rawContent.toLowerCase().includes('[video]')) {
             videoUrl = await getVideoForCharacter(characterAvatar)
             rawContent = rawContent.replace(/\[video\]/gi, '').trim()
           }
 
-          // ГАРАНТИЯ: Если текст пришел пустой (из-за цензуры/ошибки), подставляем мок
           const finalContent = rawContent.length > 0 ? rawContent : FALLBACK_MOCK_TEXT
 
           const aiMessageId = generateId()
@@ -422,11 +416,35 @@ export function useChat(activeCharacterId: string | null, characterAvatar?: stri
     [activeCharacterId, characterAvatar, isAudioMode]
   )
 
+  // Новая функция отправки картинки (подарка) от имени пользователя
+  const sendImageMessage = useCallback(
+    async (imageUrl: string) => {
+      if (!activeCharacterId) return
+
+      const userMessage: Message = {
+        id: generateId(),
+        role: 'user',
+        content: '',
+        imageUrl: imageUrl,
+        timestamp: new Date(),
+        characterId: activeCharacterId,
+      }
+
+      setMessages((prev) => [...prev, userMessage])
+      await persistMessage(userMessage, activeCharacterId)
+
+      // Симулируем отправку сопроводительного сообщения ИИ
+      await sendMessage('I sent you a gift!')
+    },
+    [activeCharacterId, sendMessage]
+  )
+
   return {
     messages,
     isTyping,
     isReady,
     isAudioMode,
     sendMessage,
+    sendImageMessage,
   }
 }
