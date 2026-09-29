@@ -318,7 +318,7 @@ export const Game2048: React.FC<GameProps> = ({ onBack }) => {
   return (
     <BaseGameScreen
       gameId="2048"
-      gameIndex={2}
+      gameIndex={1}
       title="2048"
       rulesText={GAME_RULES}
       opponentName="AI Waifu"

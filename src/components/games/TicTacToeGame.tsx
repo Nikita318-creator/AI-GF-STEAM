@@ -199,9 +199,6 @@ export const TicTacToeGame: React.FC<GameProps> = ({ onBack }) => {
                   {currentPlayer === 'X' ? 'Your Turn (X)' : 'AI Turn (O)'}
                 </span>
               )}
-              <span className="text-[10px] text-white/30 uppercase tracking-wider font-semibold">
-                Round {roundNumber} • {roundNumber <= 3 ? 'Easy Mode' : 'Hard Mode 🔥'}
-              </span>
             </div>
 
             {/* AI Turn Handler with Round Difficulty */}

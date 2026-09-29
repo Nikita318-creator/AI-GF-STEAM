@@ -19,10 +19,18 @@ interface Move {
   captured?: number
 }
 
+interface AnimatingMove {
+  from: number
+  to: number
+  deltaX: number
+  deltaY: number
+}
+
 interface SavedCheckersState {
   board: BoardState
   currentPlayer: 'player' | 'ai'
   winner: 'player' | 'ai' | 'DRAW' | null
+  halfMoveClock: number
 }
 
 const CHECKERS_STORAGE_KEY = 'checkers_saved_game_state'
@@ -33,12 +41,12 @@ const CHECKERS_RULES = `
 • Capturing: Jump over an adjacent opponent piece diagonally into an empty space to capture it.
 • Mandatory Capture: If a capture move is available, you MUST capture!
 • Kings: Reaching the opposite end transforms your piece into a King (👑), allowing backward diagonal movement & jumps!
-• Winning: Eliminate all opponent pieces or leave them with no valid legal moves.
+• Winning & Blocked Rules: Eliminate all opponent pieces OR block them so they have no valid legal moves.
+• Draw Rule: 40 consecutive moves without any captures results in an automatic DRAW.
 • Challenge Rule: The loser of the round takes off one item of clothing!
 `
 
 export const CheckersGame: React.FC<GameProps> = ({ onBack }) => {
-  // Restore saved state or initialize a fresh board
   const [board, setBoard] = useState<BoardState>(() => {
     const saved = localStorage.getItem(CHECKERS_STORAGE_KEY)
     if (saved) {
@@ -76,12 +84,24 @@ export const CheckersGame: React.FC<GameProps> = ({ onBack }) => {
     return null
   })
 
+  const [halfMoveClock, setHalfMoveClock] = useState<number>(() => {
+    const saved = localStorage.getItem(CHECKERS_STORAGE_KEY)
+    if (saved) {
+      try {
+        const parsed: SavedCheckersState = JSON.parse(saved)
+        return parsed.halfMoveClock || 0
+      } catch (e) {}
+    }
+    return 0
+  })
+
   const [selectedCell, setSelectedCell] = useState<number | null>(null)
   const [validMoves, setValidMoves] = useState<Move[]>([])
   const [isAiThinking, setIsAiThinking] = useState<boolean>(false)
   const [forcedCaptureWarning, setForcedCaptureWarning] = useState<boolean>(false)
 
-  // Save current board state to localStorage whenever state changes
+  const [animatingMove, setAnimatingMove] = useState<AnimatingMove | null>(null)
+
   useEffect(() => {
     if (winner) {
       localStorage.removeItem(CHECKERS_STORAGE_KEY)
@@ -90,10 +110,34 @@ export const CheckersGame: React.FC<GameProps> = ({ onBack }) => {
         board,
         currentPlayer,
         winner,
+        halfMoveClock,
       }
       localStorage.setItem(CHECKERS_STORAGE_KEY, JSON.stringify(stateToSave))
     }
-  }, [board, currentPlayer, winner])
+  }, [board, currentPlayer, winner, halfMoveClock])
+
+  useEffect(() => {
+    if (winner) return
+
+    if (halfMoveClock >= 40) {
+      setWinner('DRAW')
+      localStorage.removeItem(CHECKERS_STORAGE_KEY)
+      const globalScoreUpdate = (window as any).__updateGameScore
+      if (typeof globalScoreUpdate === 'function') globalScoreUpdate('draw')
+      return
+    }
+
+    const currentMoves = getAllMoves(board, currentPlayer)
+    if (currentMoves.length === 0) {
+      const winnerSide = currentPlayer === 'player' ? 'ai' : 'player'
+      setWinner(winnerSide)
+      localStorage.removeItem(CHECKERS_STORAGE_KEY)
+      const globalScoreUpdate = (window as any).__updateGameScore
+      if (typeof globalScoreUpdate === 'function') {
+        globalScoreUpdate(winnerSide === 'player' ? 'win' : 'loss')
+      }
+    }
+  }, [board, currentPlayer, winner, halfMoveClock])
 
   function initBoard(): BoardState {
     const b: BoardState = Array(64).fill(null)
@@ -291,11 +335,8 @@ export const CheckersGame: React.FC<GameProps> = ({ onBack }) => {
     setTimeout(() => setForcedCaptureWarning(false), 1200)
   }
 
-  const handleCellClick = (
-    index: number,
-    updateScore: (res: 'win' | 'loss' | 'draw') => void
-  ) => {
-    if (winner || currentPlayer !== 'player' || isAiThinking) return
+  const handleCellClick = (index: number) => {
+    if (winner || currentPlayer !== 'player' || isAiThinking || animatingMove) return
 
     const piece = board[index]
     const allPlayerMoves = getAllMoves(board, 'player')
@@ -317,17 +358,35 @@ export const CheckersGame: React.FC<GameProps> = ({ onBack }) => {
     if (selectedCell !== null) {
       const moveToExecute = validMoves.find((m) => m.to === index)
       if (moveToExecute) {
-        executeMove(moveToExecute, updateScore)
+        executeAnimatedMove(moveToExecute)
       } else if (hasMandatoryCaptures) {
         triggerForcedCaptureWarning()
       }
     }
   }
 
-  const executeMove = (
-    move: Move,
-    updateScore: (res: 'win' | 'loss' | 'draw') => void
-  ) => {
+  // Ultra-fast & crisp movement animation (120ms ease-out)
+  const executeAnimatedMove = (move: Move) => {
+    const fromPos = getPos(move.from)
+    const toPos = getPos(move.to)
+
+    const deltaX = (toPos.col - fromPos.col) * 100
+    const deltaY = (toPos.row - fromPos.row) * 100
+
+    setAnimatingMove({
+      from: move.from,
+      to: move.to,
+      deltaX,
+      deltaY,
+    })
+
+    setTimeout(() => {
+      executeMoveStateUpdate(move)
+      setAnimatingMove(null)
+    }, 120)
+  }
+
+  const executeMoveStateUpdate = (move: Move) => {
     const newBoard = [...board]
     const piece = newBoard[move.from]!
     const { row: toRow } = getPos(move.to)
@@ -337,6 +396,9 @@ export const CheckersGame: React.FC<GameProps> = ({ onBack }) => {
 
     if (move.captured !== undefined) {
       newBoard[move.captured] = null
+      setHalfMoveClock(0)
+    } else {
+      setHalfMoveClock((prev) => prev + 1)
     }
 
     if (piece === 'player' && toRow === 0) newBoard[move.to] = 'player-king'
@@ -346,30 +408,12 @@ export const CheckersGame: React.FC<GameProps> = ({ onBack }) => {
     setSelectedCell(null)
     setValidMoves([])
 
-    const nextPlayer = currentPlayer === 'player' ? 'ai' : 'player'
-    const opponentMoves = getAllMoves(newBoard, nextPlayer)
-
-    if (opponentMoves.length === 0) {
-      const winnerSide = currentPlayer
-      setWinner(winnerSide)
-      localStorage.removeItem(CHECKERS_STORAGE_KEY)
-      if (winnerSide === 'player') updateScore('win')
-      else updateScore('loss')
-      return
-    }
-
-    setCurrentPlayer(nextPlayer)
+    setCurrentPlayer((prev) => (prev === 'player' ? 'ai' : 'player'))
   }
 
   const makeAiMove = (roundNumber: number) => {
     const aiMoves = getAllMoves(board, 'ai')
-    if (aiMoves.length === 0) {
-      setWinner('player')
-      localStorage.removeItem(CHECKERS_STORAGE_KEY)
-      const globalScoreUpdate = (window as any).__updateGameScore
-      if (typeof globalScoreUpdate === 'function') globalScoreUpdate('win')
-      return
-    }
+    if (aiMoves.length === 0) return
 
     let maxDepth = 1
     if (roundNumber >= 3 && roundNumber <= 4) maxDepth = 2
@@ -378,10 +422,7 @@ export const CheckersGame: React.FC<GameProps> = ({ onBack }) => {
     const result = minimaxCheckers(board, maxDepth, -Infinity, Infinity, true)
     const selectedMove = result.move || aiMoves[0]
 
-    executeMove(selectedMove, (res) => {
-      const globalScoreUpdate = (window as any).__updateGameScore
-      if (typeof globalScoreUpdate === 'function') globalScoreUpdate(res)
-    })
+    executeAnimatedMove(selectedMove)
   }
 
   const resetRound = () => {
@@ -391,7 +432,9 @@ export const CheckersGame: React.FC<GameProps> = ({ onBack }) => {
     setValidMoves([])
     setCurrentPlayer('player')
     setWinner(null)
+    setHalfMoveClock(0)
     setForcedCaptureWarning(false)
+    setAnimatingMove(null)
   }
 
   const allPlayerMoves = getAllMoves(board, 'player')
@@ -404,14 +447,13 @@ export const CheckersGame: React.FC<GameProps> = ({ onBack }) => {
   return (
     <BaseGameScreen
       gameId="checkers"
-      gameIndex={2}
+      gameIndex={3}
       title="Checkers"
       rulesText={CHECKERS_RULES}
       opponentName="AI Waifu"
       onBack={onBack}
     >
-      {({ score, updateScore }) => {
-        ;(window as any).__updateGameScore = updateScore
+      {({ score }) => {
         const roundNumber = score.wins + score.losses + score.draws + 1
 
         return (
@@ -422,6 +464,7 @@ export const CheckersGame: React.FC<GameProps> = ({ onBack }) => {
                 <span className="text-base font-bold text-emerald-400 animate-pulse">
                   {winner === 'player' && '🎉 You Won!'}
                   {winner === 'ai' && '💔 AI Waifu Won!'}
+                  {winner === 'DRAW' && '🤝 Draw (40 moves limit)!'}
                 </span>
               ) : isAiThinking ? (
                 <span className="text-sm font-medium text-rose-400 flex items-center gap-2">
@@ -433,13 +476,15 @@ export const CheckersGame: React.FC<GameProps> = ({ onBack }) => {
                   ⚠️ Mandatory Capture! You MUST jump!
                 </span>
               ) : (
-                <span className="text-sm font-medium text-white/60">
-                  {currentPlayer === 'player' ? 'Your Turn (Red)' : 'AI Turn (Dark)'}
-                </span>
+                <div className="flex flex-col items-center">
+                  <span className="text-sm font-medium text-white/60">
+                    {currentPlayer === 'player' ? 'Your Turn (Red)' : 'AI Turn (Dark)'}
+                  </span>
+                  <span className="text-[10px] text-white/30">
+                    Quiet Moves: {halfMoveClock}/40
+                  </span>
+                </div>
               )}
-              <span className="text-[10px] text-white/30 uppercase tracking-wider font-semibold">
-                Round {roundNumber} • {roundNumber <= 2 ? 'Easy' : roundNumber <= 4 ? 'Medium' : 'Hard 🔥'}
-              </span>
             </div>
 
             {/* AI Turn Controller */}
@@ -447,12 +492,13 @@ export const CheckersGame: React.FC<GameProps> = ({ onBack }) => {
               currentPlayer={currentPlayer}
               winner={winner}
               roundNumber={roundNumber}
+              animatingMove={animatingMove}
               onMove={(r) => makeAiMove(r)}
               setIsAiThinking={setIsAiThinking}
             />
 
             {/* 8x8 Board */}
-            <div className="w-72 h-72 sm:w-80 sm:h-80 aspect-square grid grid-cols-8 grid-rows-8 bg-slate-900 rounded-2xl border-2 border-white/10 shadow-2xl overflow-hidden p-1 gap-0.5 shrink-0">
+            <div className="w-72 h-72 sm:w-80 sm:h-80 aspect-square grid grid-cols-8 grid-rows-8 bg-slate-900 rounded-2xl border-2 border-white/10 shadow-2xl overflow-hidden p-1 gap-0.5 shrink-0 relative">
               {board.map((cell, idx) => {
                 const { row, col } = getPos(idx)
                 const isDarkSquare = (row + col) % 2 === 1
@@ -460,12 +506,14 @@ export const CheckersGame: React.FC<GameProps> = ({ onBack }) => {
                 const isValidTarget = validMoves.some((m) => m.to === idx)
                 const isMandatoryPiece = mandatoryCaptureIndices.has(idx)
 
+                const isAnimatingThisPiece = animatingMove?.from === idx
+
                 return (
                   <button
                     key={idx}
-                    onClick={() => handleCellClick(idx, updateScore)}
-                    disabled={!isDarkSquare || !!winner || currentPlayer !== 'player' || isAiThinking}
-                    className={`w-full h-full flex items-center justify-center relative transition-all duration-150 ${
+                    onClick={() => handleCellClick(idx)}
+                    disabled={!isDarkSquare || !!winner || currentPlayer !== 'player' || isAiThinking || !!animatingMove}
+                    className={`w-full h-full flex items-center justify-center relative transition-colors duration-150 ${
                       isDarkSquare ? 'bg-slate-800' : 'bg-slate-950/40'
                     } ${isSelected ? 'ring-2 ring-amber-400 z-10' : ''}`}
                   >
@@ -475,7 +523,17 @@ export const CheckersGame: React.FC<GameProps> = ({ onBack }) => {
 
                     {cell && (
                       <div
-                        className={`w-3/4 h-3/4 rounded-full flex items-center justify-center shadow-lg transition-transform ${
+                        style={{
+                          transform: isAnimatingThisPiece
+                            ? `translate(${animatingMove.deltaX}%, ${animatingMove.deltaY}%)`
+                            : 'translate(0, 0)',
+                          transition: isAnimatingThisPiece
+                            ? 'transform 120ms ease-out'
+                            : 'none',
+                        }}
+                        className={`w-3/4 h-3/4 rounded-full flex items-center justify-center shadow-lg relative ${
+                          isAnimatingThisPiece ? 'z-50 shadow-2xl scale-105' : 'z-10'
+                        } ${
                           cell.startsWith('player')
                             ? 'bg-gradient-to-br from-rose-500 to-red-700 border border-rose-300 shadow-rose-900/50'
                             : 'bg-gradient-to-br from-indigo-600 to-slate-900 border border-indigo-400 shadow-indigo-950/80'
@@ -486,7 +544,7 @@ export const CheckersGame: React.FC<GameProps> = ({ onBack }) => {
                         }`}
                       >
                         {cell.endsWith('king') && (
-                          <span className="text-[10px] sm:text-xs">👑</span>
+                          <span className="text-[10px] sm:text-xs select-none">👑</span>
                         )}
                       </div>
                     )}
@@ -513,19 +571,20 @@ const CheckersAiTurnEffect: React.FC<{
   currentPlayer: 'player' | 'ai'
   winner: string | null
   roundNumber: number
+  animatingMove: AnimatingMove | null
   onMove: (round: number) => void
   setIsAiThinking: (thinking: boolean) => void
-}> = ({ currentPlayer, winner, roundNumber, onMove, setIsAiThinking }) => {
+}> = ({ currentPlayer, winner, roundNumber, animatingMove, onMove, setIsAiThinking }) => {
   useEffect(() => {
-    if (currentPlayer === 'ai' && !winner) {
+    if (currentPlayer === 'ai' && !winner && !animatingMove) {
       setIsAiThinking(true)
       const timer = setTimeout(() => {
         onMove(roundNumber)
         setIsAiThinking(false)
-      }, 750)
+      }, 250)
       return () => clearTimeout(timer)
     }
-  }, [currentPlayer, winner, roundNumber])
+  }, [currentPlayer, winner, roundNumber, animatingMove])
 
   return null
 }
