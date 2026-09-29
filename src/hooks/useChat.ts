@@ -25,6 +25,20 @@ function cleanResponse(text: string): string {
   return text.replace(/\[video\]/g, '').replace(/\[photo\]/g, '').trim()
 }
 
+function getPromptForCharacter(category: CharacterCategory, layout: string): string {
+  switch (category) {
+    case 'anime':
+      return getSystemPromptForAnime(layout)
+    case 'milf':
+      return getSystemPromptForMilf(layout)
+    case 'ex':
+      return getSystemPromptForEx(layout)
+    case 'gf':
+    default:
+      return getSystemPrompt(layout)
+  }
+}
+
 export function getAvatarNumber(avatarPath?: string): number {
   if (!avatarPath) return 0
   const fileName = avatarPath.split('/').pop() || ''
@@ -38,6 +52,18 @@ export function getCharacterCategory(avatarPath?: string): CharacterCategory {
   if (num >= 21 && num <= 25) return 'milf'
   if (num === 26) return 'ex'
   return 'gf'
+}
+
+function getRandomGiftResponsePhoto(avatarPath?: string): string {
+  const category = getCharacterCategory(avatarPath)
+
+  if (category === 'anime') {
+    const randomNum = Math.floor(Math.random() * 262) + 1
+    return `https://raw.githubusercontent.com/uvarovn771-blip/anime_additional_pics/main/untitled/test${randomNum}.jpg`
+  } else {
+    const randomNum = Math.floor(Math.random() * 236) + 1
+    return `https://raw.githubusercontent.com/uvarovn771-blip/GF_photos/main/test${randomNum}.jpg`
+  }
 }
 
 function getRandomPhotoForCharacter(avatarPath?: string): string {
@@ -97,25 +123,25 @@ async function getVideoForCharacter(avatarPath?: string): Promise<string | undef
     if (fetchedUrl) return fetchedUrl
   }
 
-  // switch (category) {
-  //   case 'anime': {
-  //     const randomNum = Math.floor(Math.random() * 10) + 1
-  //     return `/videos/anime/video${randomNum}.mp4`
-  //   }
-  //   case 'milf': {
-  //     const randomNum = Math.floor(Math.random() * 10) + 1
-  //     return `/videos/milf/video${randomNum}.mp4`
-  //   }
-  //   case 'ex': {
-  //     const randomNum = Math.floor(Math.random() * 10) + 1
-  //     return `/videos/ex/video${randomNum}.mp4`
-  //   }
-  //   case 'gf':
-  //   default: {
-  //     const randomNum = Math.floor(Math.random() * 10) + 1
-  //     return `/videos/real/video${randomNum}.mp4`
-  //   }
-  // }
+  switch (category) {
+    case 'anime': {
+      const randomNum = Math.floor(Math.random() * 10) + 1
+      return `/videos/anime/video${randomNum}.mp4`
+    }
+    case 'milf': {
+      const randomNum = Math.floor(Math.random() * 10) + 1
+      return `/videos/milf/video${randomNum}.mp4`
+    }
+    case 'ex': {
+      const randomNum = Math.floor(Math.random() * 10) + 1
+      return `/videos/ex/video${randomNum}.mp4`
+    }
+    case 'gf':
+    default: {
+      const randomNum = Math.floor(Math.random() * 10) + 1
+      return `/videos/real/video${randomNum}.mp4`
+    }
+  }
 }
 
 function formatChatHistory(messages: Message[]): string {
@@ -148,20 +174,6 @@ function buildFullMessage(ctx: RetryContext, attempt: number): string {
     case 3:
     default:
       return `${systemPrompt}\n${userText}`
-  }
-}
-
-function getPromptForCharacter(category: CharacterCategory, layout: string): string {
-  switch (category) {
-    case 'anime':
-      return getSystemPromptForAnime(layout)
-    case 'milf':
-      return getSystemPromptForMilf(layout)
-    case 'ex':
-      return getSystemPromptForEx(layout)
-    case 'gf':
-    default:
-      return getSystemPrompt(layout)
   }
 }
 
@@ -271,6 +283,7 @@ export function useChat(activeCharacterId: string | null, characterAvatar?: stri
 
       const category = getCharacterCategory(characterAvatar)
       const dynamicPrompt = getPromptForCharacter(category, currentLayout)
+
       const currentMessages = messagesRef.current
       const formattedHistory = formatChatHistory(currentMessages)
 
@@ -434,7 +447,7 @@ export function useChat(activeCharacterId: string | null, characterAvatar?: stri
     [activeCharacterId, characterAvatar, isAudioMode]
   )
 
-  // Новая функция отправки картинки (подарка) от имени пользователя
+  // Функция отправки подарка: не стучит в сеть, показывает анимацию печатания и возвращает спайси фотку
   const sendImageMessage = useCallback(
     async (imageUrl: string) => {
       if (!activeCharacterId) return
@@ -451,10 +464,26 @@ export function useChat(activeCharacterId: string | null, characterAvatar?: stri
       setMessages((prev) => [...prev, userMessage])
       await persistMessage(userMessage, activeCharacterId)
 
-      // Симулируем отправку сопроводительного сообщения ИИ
-      await sendMessage('I sent you a gift!')
+      // Включаем тайпинг (симулируем обдумывание/подготовку ответа)
+      setIsTyping(true)
+      await new Promise((r) => setTimeout(r, 1500))
+
+      const responsePhotoUrl = getRandomGiftResponsePhoto(characterAvatar)
+
+      const aiMessage: Message = {
+        id: generateId(),
+        role: 'assistant',
+        content: '',
+        timestamp: new Date(),
+        characterId: activeCharacterId,
+        imageUrl: responsePhotoUrl,
+      }
+
+      setMessages((prev) => [...prev, aiMessage])
+      await persistMessage(aiMessage, activeCharacterId)
+      setIsTyping(false)
     },
-    [activeCharacterId, sendMessage]
+    [activeCharacterId, characterAvatar]
   )
 
   return {
